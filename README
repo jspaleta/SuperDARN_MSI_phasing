@@ -1,0 +1,9 @@
+Collection of programs to use for MSI phasing matrix calibration and programming.
+
+Calibration routines depend on communication with an HP network analyzer.
+Digital IO control assumes an ADLINK-PCI-DIO-120 card
+VENDOR_ID 0x494f
+DEVICE_ID 0x0c78
+
+These programs are pretty rough and will require editting and re-compilation.
+Contributions to make these more user friendly are more than welcome.
