@@ -2,10 +2,9 @@
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <signal.h>
 #include <math.h>
 #include <netdb.h>
@@ -47,7 +46,7 @@
 #define F_OFFSET 64 
 #define MIN_FREQ 11.9E6
 #define MAX_FREQ 12.1E6
-
+extern char *optarg;
 int32_t sock=-1;
 int32_t verbose=2;
 char beamfile_prefix[20]="beamcodes_cal";
@@ -777,8 +776,10 @@ int32_t read_data(uint32_t base,int32_t radar){
 
 
 
-int32_t main(int32_t argc, char **argv)
+int32_t main(int argc, char **argv)
 {
+  int opt;
+  int read_table,write_table,read_matrix,write_matrix;
   char *caldir=NULL;
   double *pwr_mag[MAX_FREQS];
   double freqs[MAX_FREQS];
@@ -805,6 +806,40 @@ int32_t main(int32_t argc, char **argv)
 	struct		 _clockperiod new, old;
 	struct		 timespec start_p, stop_p, start, stop, nsleep;
 #endif
+  radar=0;
+  while ((opt = getopt(argc, argv, "n:c:lrwRW")) != -1) {
+    switch (opt) {
+      case 'n':
+        radar=atoi(optarg);
+        break;
+      case 'l':
+        loop=1;
+        break;
+      case 'c':
+        card=atoi(optarg);
+        break;
+      case 'r':
+        read_table=1;
+        break;
+      case 'w':
+        write_table=1;
+        break;
+      case 'R':
+        read_matrix=1;
+        break;
+      case 'W':
+        write_matrix=1;
+        break;
+      default: /* '?' */
+        fprintf(stderr, "Usage: %s [-l] [-c] first_card\n", argv[0]); 
+        exit(EXIT_FAILURE);
+    }
+  }
+    printf("Radar: %d\n",radar);
+  if((radar !=1) && (radar != 2) ) {
+      fprintf(stderr,"%s: invoke with -n 1 or -n 2 to set radar dio outputs correctly\n",argv[0]);
+      exit(EXIT_FAILURE);
+  }
   caldir=getenv("MSI_CALDIR");
   if (caldir==NULL) {
     caldir=strdup("/data/calibrations/");
@@ -813,14 +848,6 @@ int32_t main(int32_t argc, char **argv)
   for(i=0;i<MAX_FREQS;i++) {
     best_attencode[i]=NULL;
   } 
-    if(argc <2 ) {
-      fprintf(stderr,"%s: invoke with radar number (1 or 2)\n",argv[0]);
-      fprintf(stderr,"%s:   optional second argument: loop over cards (1)\n",argv[0]);
-      exit(0);
-    }
-    radar=atoi(argv[1]);
-    printf("Radar: %d\n",radar);
-    if (argc==3) loop=atoi(argv[2]);
     printf("Loop: %d\n",loop);
     printf("\n\nEnter Radar Name: ");
     fflush(stdin);
@@ -965,18 +992,19 @@ int32_t main(int32_t argc, char **argv)
         read=0;
       }
   }
-
-  if(loop==0) {
-    c=-1; 
+  c=-1; 
+  if (card==-1) {
+    if(loop==0) {
     printf("\n\nEnter Phasing Card Number: ");
     fflush(stdin);
     fflush(stdout);
     scanf("%d", &card);
     fflush(stdout);
     fflush(stdin);
-  } else {
-    card=0;
-    printf("Radar: <%s>  All Cards\n",radar_name);
+    } else {
+      card=0;
+      printf("Radar: <%s>  All Cards\n",radar_name);
+    }
   }
   c=card;
   while((c<CARDS) && (c >=0)) {
