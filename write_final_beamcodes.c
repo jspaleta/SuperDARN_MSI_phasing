@@ -779,6 +779,7 @@ int32_t read_data(uint32_t base,int32_t radar){
 
 int32_t main(int32_t argc, char **argv)
 {
+  char *caldir=NULL;
   double *pwr_mag[MAX_FREQS];
   double freqs[MAX_FREQS];
   double angles[MAX_ANGLES];
@@ -804,6 +805,11 @@ int32_t main(int32_t argc, char **argv)
 	struct		 _clockperiod new, old;
 	struct		 timespec start_p, stop_p, start, stop, nsleep;
 #endif
+  caldir=getenv("MSI_CALDIR");
+  if (caldir==NULL) {
+    caldir=strdup("/data/calibrations/");
+  }
+  fprintf(stdout,"CALDIR: %s\n",caldir);
   for(i=0;i<MAX_FREQS;i++) {
     best_attencode[i]=NULL;
   } 
@@ -824,7 +830,7 @@ int32_t main(int32_t argc, char **argv)
     fflush(stdin);
     printf("Radar: <%s>  Card: %d\n",radar_name,card);
     fflush(stdout);
-    sprintf(dir,"/home/jspaleta/data/calibrations/%s/",radar_name);
+    sprintf(dir,"/%s/%s/",caldir,radar_name);
     switch(radar) {
       case 1:
             portC0=PC_GRP_0;
