@@ -36,7 +36,7 @@
 #define NEW_PMAT 1 
 #define write_to_matrix 0 
 #define read_lookup_table 1 
-#define write_lookup_table 1 
+#define write_lookup_table 0 
 #define CARDS 20 
 #define PHASECODES 8192 
 #define BEAMCODES 8192 
@@ -382,7 +382,7 @@ int32_t write_attenuators(uint32_t base, int32_t card, int32_t code, int32_t dat
         out8(base+cntrl1,0x13);
     // disable writing
         set_RW(base,READ,radar);
-        delay(3);
+        usleep(3);
     // verify written data
     // read PortA and PortB to see if EEPROM output is same as progammed
         temp=in8(base+portB);
@@ -446,7 +446,7 @@ int32_t verify_attenuators(uint32_t base, int32_t card, int32_t code, int32_t da
         set_SA(base,ATTEN,radar);
     // disable writing
         set_RW(base,READ,radar);
-        delay(10);
+        usleep(10);
     // verify written data
     // read PortA and PortB to see if EEPROM output is same as progammed
         temp=in8(base+portB);
@@ -516,7 +516,7 @@ int32_t verify_data_new(uint32_t base, int32_t card, int32_t code, int32_t data,
         out8(base+cntrl1,0x13);
     // disable writing
         set_RW(base,READ,radar);
-        delay(10);
+        usleep(10);
     // verify written data
     // read PortA and PortB to see if EEPROM output is same as progammed
         temp=in8(base+portB);
@@ -603,7 +603,7 @@ int32_t write_data_new(uint32_t base, int32_t card, int32_t code, int32_t data,i
         out8(base+cntrl1,0x13);
     // disable writing
         set_RW(base,READ,radar);
-        delay(10);
+        usleep(10);
     // verify written data
     // read PortA and PortB to see if EEPROM output is same as progammed
         temp=in8(base+portB);
@@ -779,7 +779,7 @@ int32_t read_data(uint32_t base,int32_t radar){
 int32_t main(int argc, char **argv)
 {
   int opt;
-  int read_table,write_table,read_matrix,write_matrix;
+  int read_table=read_lookup_table,write_table=write_lookup_table,read_matrix=0,write_matrix=write_to_matrix;
   char *caldir=NULL;
   double *pwr_mag[MAX_FREQS];
   double freqs[MAX_FREQS];
@@ -807,7 +807,7 @@ int32_t main(int argc, char **argv)
 	struct		 timespec start_p, stop_p, start, stop, nsleep;
 #endif
   radar=0;
-  while ((opt = getopt(argc, argv, "n:c:lrwRW")) != -1) {
+  while ((opt = getopt(argc, argv, "n:c:lrwRWh")) != -1) {
     switch (opt) {
       case 'n':
         radar=atoi(optarg);
@@ -830,15 +830,21 @@ int32_t main(int argc, char **argv)
       case 'W':
         write_matrix=1;
         break;
+      case 'h':
       default: /* '?' */
-        fprintf(stderr, "Usage: %s [-l] [-c] first_card\n", argv[0]); 
+        fprintf(stderr, "Usage: %s [-lrwRW] [-c] first_card [-n] radar number \n\t l: loop\n\t r: Read existing loopup table\n\t w: Write lookup table\n", argv[0]); 
+        fprintf(stderr, "\t R: Read Phasing Matrix Memory\n\t W: Write Phasing Matrix Memory\n"); 
         exit(EXIT_FAILURE);
     }
   }
+  if(write_matrix || read_matrix) {
     printf("Radar: %d\n",radar);
-  if((radar !=1) && (radar != 2) ) {
+    if((radar !=1) && (radar != 2) ) {
       fprintf(stderr,"%s: invoke with -n 1 or -n 2 to set radar dio outputs correctly\n",argv[0]);
       exit(EXIT_FAILURE);
+    }
+  } else {
+    radar=1;
   }
   caldir=getenv("MSI_CALDIR");
   if (caldir==NULL) {
@@ -950,7 +956,7 @@ int32_t main(int argc, char **argv)
   fflush(stdout);
   fflush(stdin);
 
-  if(read_lookup_table) {
+  if(read_table) {
       sprintf(filename,"%s/beamcode_lookup_table_%s.dat",dir,radar_name,c);
       beamtablefile=fopen(filename,"r+");
       printf("%p %s\n",beamtablefile,filename);
@@ -1108,18 +1114,18 @@ int32_t main(int argc, char **argv)
   } // end of card loop
   c=card;
   while((c<CARDS) && (c >=0)) {
-      printf("Writing Beamcodes to Card: %d\n",c);
-      for (b=0;b<BEAMCODES;b++) {
+      if (write_matrix) {
+        printf("Writing Beamcodes to Card: %d\n",c);
+        for (b=0;b<BEAMCODES;b++) {
          //printf("B: %d PhaseCode: %d AttenCode: %d\n",b,final_beamcodes[c][b],final_attencodes[c][b]); 
-         if (final_beamcodes[c][b] >= 0 ) {
-            if (write_to_matrix) {
+           if (final_beamcodes[c][b] >= 0 ) {
               if(NEW_PMAT) {
                 temp=write_data_new(IOBASE,c,b,final_beamcodes[c][b],radar,0);
                 for(attempt=0;attempt<10;attempt++) {
                   temp=verify_data_new(IOBASE,c,b,final_beamcodes[c][b],radar,0);
                   if(temp<0) {
                  //   printf("Verify Error: attempt: %d\n",attempt); 
-                    delay(10);
+                    usleep(10);
                   } else {
                     break;
                   }
@@ -1133,7 +1139,7 @@ int32_t main(int argc, char **argv)
                   temp=verify_attenuators(IOBASE,c,b,final_attencodes[c][b],radar);
                   if(temp<0) {
                  //   printf("Verify Error: attempt: %d\n",attempt); 
-                    delay(10);
+                    usleep(10);
                   } else {
                     break;
                   }
@@ -1146,58 +1152,58 @@ int32_t main(int argc, char **argv)
               } else {
                 temp=write_data_old(IOBASE,c,b,final_beamcodes[c][b],radar,0);
               }
-            }
-         } else {
-           //printf("final_beamcode error %d\n",b);
-            if (write_to_matrix) {
-              if(NEW_PMAT) {
-                temp=write_data_new(IOBASE,c,b,0,radar,0);
-                for(attempt=0;attempt<10;attempt++) {
-                  temp=verify_data_new(IOBASE,c,b,0,radar,0);
+           } else {
+             //printf("final_beamcode error %d\n",b);
+              if (write_matrix) {
+                if(NEW_PMAT) {
+                  temp=write_data_new(IOBASE,c,b,0,radar,0);
+                  for(attempt=0;attempt<10;attempt++) {
+                    temp=verify_data_new(IOBASE,c,b,0,radar,0);
+                    if(temp<0) {
+                   //   printf("Verify Error: attempt: %d\n",attempt); 
+                    usleep(10);
+                    } else {
+                      break;
+                    }
+                  } 
                   if(temp<0) {
-                 //   printf("Verify Error: attempt: %d\n",attempt); 
-                    delay(10);
-                  } else {
-                    break;
+                    printf("EXIT on repeat Verify Errors\n");
+                    exit(temp); 
                   }
-                } 
-                if(temp<0) {
-                  printf("EXIT on repeat Verify Errors\n");
-                  exit(temp); 
-                }
-                temp=write_attenuators(IOBASE,c,b,63,radar); //JDS need to set attenuators here
-                for(attempt=0;attempt<10;attempt++) {
-                  temp=verify_attenuators(IOBASE,c,b,63,radar);
+                  temp=write_attenuators(IOBASE,c,b,63,radar); //JDS need to set attenuators here
+                  for(attempt=0;attempt<10;attempt++) {
+                    temp=verify_attenuators(IOBASE,c,b,63,radar);
+                    if(temp<0) {
+                 //   printf("Verify Error: attempt: %d\n",attempt); 
+                      usleep(10);
+                    } else {
+                      break;
+                    }
+                  } 
                   if(temp<0) {
-                 //   printf("Verify Error: attempt: %d\n",attempt); 
-                    delay(10);
-                  } else {
-                    break;
+                    printf("EXIT on repeat Verify Errors\n");
+                    exit(temp); 
                   }
-                } 
-                if(temp<0) {
-                  printf("EXIT on repeat Verify Errors\n");
-                  exit(temp); 
-                }
 
-              } else {
-                temp=write_data_old(IOBASE,c,b,0,radar,0);
+                } else {
+                  temp=write_data_old(IOBASE,c,b,0,radar,0);
+                }
               }
-            }
-         }
-      } //end beamcode loop 
+           }
+        } //end beamcode loop 
+      } //end write loop 
 
-      printf("Verifying Beamcodes to Card: %d\n",c);
-      for (b=0;b<BEAMCODES;b++) {
-         if (final_beamcodes[c][b] >= 0 ) {
-            if (write_to_matrix) {
-              if(NEW_PMAT) {
+      if (write_matrix) {
+        printf("Verifying Beamcodes to Card: %d\n",c);
+        for (b=0;b<BEAMCODES;b++) {
+           if (final_beamcodes[c][b] >= 0 ) {
+             if(NEW_PMAT) {
                 beam_code(IOBASE,b,radar);
                 for(attempt=0;attempt<10;attempt++) {
                   temp=verify_data_new(IOBASE,c,b,final_beamcodes[c][b],radar,0);
                   if(temp<0) {
                   //  printf("Verify Error: attempt: %d\n",attempt); 
-                    delay(10);
+                    usleep(10);
                   } else {
                     break;
                   }
@@ -1210,7 +1216,7 @@ int32_t main(int argc, char **argv)
                   temp=verify_attenuators(IOBASE,c,b,final_attencodes[c][b],radar);
                   if(temp<0) {
                   //  printf("Verify Error: attempt: %d\n",attempt); 
-                    delay(10);
+                    usleep(10);
                   } else {
                     break;
                   }
@@ -1220,18 +1226,17 @@ int32_t main(int argc, char **argv)
                   exit(temp); 
                 }
 
-
-              } else {
+             } else {
                 //temp=write_data_old(IOBASE,c,beamcode,b,radar,0);
-              }
-            }
-         }
-      } //end beamcode loop 
+             }
+          }
+        } //end beamcode loop 
+      } //end write if
       if(loop) c++;
       else c=-1;
   } // end card loop
 //JDS write to lookup table
-    if(write_lookup_table) {
+    if(write_table) {
       printf("Writing Beam lookup table\n");
       sprintf(filename,"%s/beamcode_lookup_table_%s.dat",dir,radar_name,c);
       beamtablefile=fopen(filename,"w+");
