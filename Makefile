@@ -59,7 +59,7 @@ SUMMARY_SOURCES=summary_generator.c
 SUMMARY_OBJECTS=$(SUMMARY_SOURCES:.c=.o)
 SUMMARY_EXECUTABLE=summary_generator
 
-FINAL_SOURCES=write_final_beamcodes.c  _open_PLX9050.c _prog_conventions.c utils.c 
+FINAL_SOURCES=write_final_beamcodes.c  common_functions.c _open_PLX9050.c _prog_conventions.c utils.c 
 FINAL_OBJECTS=$(FINAL_SOURCES:.c=.o)
 FINAL_EXECUTABLE=write_final_beamcodes
 

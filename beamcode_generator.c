@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/time.h>
 
 #define MAX_CARDS 20 
@@ -13,8 +14,6 @@
 #define NUM_ANGLES 22 
 #define USE_MEASURED_ATTENS 1 
 int32_t verbose=1;
-char radar_name[80]="adw";
-char dirstub[160]="/home/jspaleta/data/calibrations/adw/";
 FILE *timedelayfile=NULL;
 FILE *attenfile=NULL;
 FILE *summaryfile=NULL;
@@ -79,20 +78,38 @@ int32_t main()
   double time_needed,angle,difference;
   double atten,atten_steps[6];
   int32_t best_atten_code;
+  char *caldir=NULL;
+  char radar_name[80]="";
+  char dirstub[160]="";
+
+  caldir=getenv("MSI_CALDIR");
+  if (caldir==NULL) {
+    caldir=strdup("/data/calibrations/");
+  }
+  fprintf(stdout,"CALDIR: %s\n",caldir);
+  printf("\n\nEnter Radar Name: ");
+  fflush(stdin);
+  fflush(stdout);
+  scanf("%s", &radar_name);
+  fflush(stdout);
+  fflush(stdin);
+  printf("Radar: <%s>\n",radar_name);
+  fflush(stdout);
+  sprintf(dirstub,"/%s/%s/",caldir,radar_name);
 
 //  printf("Nulling arrays\n");
   freq=NULL;
   atten_freq=NULL;
   num_freqs=0;
-        ave_timedelay=NULL;
-        ave_pwr_mag=NULL;
-        mid_pwr_mag=NULL;
-        min_pwr_mag=NULL;
-        max_pwr_mag=NULL;
-  	ave_attencode=NULL;
-  	mid_attencode=NULL;
-  	min_attencode=NULL;
-  	max_attencode=NULL;
+  ave_timedelay=NULL;
+  ave_pwr_mag=NULL;
+  mid_pwr_mag=NULL;
+  min_pwr_mag=NULL;
+  max_pwr_mag=NULL;
+  ave_attencode=NULL;
+  mid_attencode=NULL;
+  min_attencode=NULL;
+  max_attencode=NULL;
   highest_time0_value=0;
   highest_time0_card=-1;
   best_phasecode=NULL;
