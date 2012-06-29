@@ -8,8 +8,6 @@
 //#define MAX_FREQS 1201 
 #define MAX_PHASES 8192
 int32_t verbose=0;
-char radar_name[80]="adw";
-char dirstub[120]="/home/jspaleta/data/calibrations/adw/";
 FILE *timedelayfile=NULL;
 FILE *summaryfile=NULL;
 struct timeval t0,t1,t2,t3;
@@ -32,6 +30,25 @@ int32_t main()
   double lowest_pwr_mag=1E10; // freq,card,phasecode
   double time_needed,angle,difference;
   double ave_delay0,stdev_delay0;
+  char *caldir=NULL;
+  char radar_name[80]="";
+  char dirstub[160]="";
+
+  caldir=getenv("MSI_CALDIR");
+  if (caldir==NULL) {
+    caldir=strdup("/data/calibrations/");
+  }
+  fprintf(stdout,"CALDIR: %s\n",caldir);
+  printf("\n\nEnter Radar Name: ");
+  fflush(stdin);
+  fflush(stdout);
+  scanf("%s", &radar_name);
+  fflush(stdout);
+  fflush(stdin);
+  printf("Radar: <%s>\n",radar_name);
+  fflush(stdout);
+  sprintf(dirstub,"/%s/%s/",caldir,radar_name);
+
   if (verbose>1) printf("Nulling arrays\n");
   freq=NULL;
   ave_timedelay=NULL;

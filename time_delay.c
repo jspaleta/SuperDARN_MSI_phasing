@@ -14,8 +14,6 @@
 int32_t quick_flag=1;
 int32_t fatal_error=1;
 int32_t verbose=0;
-char radar_name[80]="adw";
-char dirstub[120]="/home/jspaleta/data/calibrations/adw";
 FILE *calfile=NULL;
 FILE *timedelayfile=NULL;
 struct timeval t0,t1,t2,t3;
@@ -66,6 +64,24 @@ int32_t main()
   int32_t basecode,lowcode,refill,min_timedelay_index,max_timedelay_index,max_atten_index;
   char filename[120];
   int32_t errflag=0;
+  char *caldir=NULL;
+  char radar_name[80]="";
+  char dirstub[160]="";
+
+  caldir=getenv("MSI_CALDIR");
+  if (caldir==NULL) {
+    caldir=strdup("/data/calibrations/");
+  }
+  fprintf(stdout,"CALDIR: %s\n",caldir);
+  printf("\n\nEnter Radar Name: ");
+  fflush(stdin);
+  fflush(stdout);
+  scanf("%s", &radar_name);
+  fflush(stdout);
+  fflush(stdin);
+  printf("Radar: <%s>\n",radar_name);
+  fflush(stdout);
+  sprintf(dirstub,"/%s/%s/",caldir,radar_name);
 
   for(i=0;i<MAX_FREQS;i++) {
     highest_time_delay_card[i]=-1;
@@ -229,21 +245,20 @@ int32_t main()
           }        
         }
       }
-    }
-    max_timedelay_diff=0.0; 
-    min_timedelay_diff=1E13; 
-    max_atten_diff=0.0; 
-    ave_timedelay_diff=0.0; 
-    ave_atten_diff=0.0; 
-    ave_delay_bit1=0.0;
-    ave_delay_bit2=0.0;
-    ave_delay_bit3=0.0;
-    ave_atten_bit1=0.0;
-    ave_atten_bit2=0.0;
-    ave_atten_bit3=0.0;
-    fprintf(stdout,"Common Time Delay Offset(ns): %lf %lf\n",ave_timedelay[0],ave_delay0);
-    fprintf(stdout,"Common Time Delay StDev(ns): %lf %lf\n",stdev_timedelay[0],stdev_delay0);
-    for(i=0;i<num_freqs;i++) {
+     max_timedelay_diff=0.0; 
+     min_timedelay_diff=1E13; 
+     max_atten_diff=0.0; 
+     ave_timedelay_diff=0.0; 
+     ave_atten_diff=0.0; 
+     ave_delay_bit1=0.0;
+     ave_delay_bit2=0.0;
+     ave_delay_bit3=0.0;
+     ave_atten_bit1=0.0;
+     ave_atten_bit2=0.0;
+     ave_atten_bit3=0.0;
+     fprintf(stdout,"Common Time Delay Offset(ns): %lf %lf\n",ave_timedelay[0],ave_delay0);
+     fprintf(stdout,"Common Time Delay StDev(ns): %lf %lf\n",stdev_timedelay[0],stdev_delay0);
+     for(i=0;i<num_freqs;i++) {
       expected_sum[i]=0.0;
       measured_sum[i]=0.0;
       atten_sum[i]=0.0;
@@ -276,24 +291,24 @@ int32_t main()
       ave_atten_bit1+=-(pwr_mag[i][1]-mag0[i]);
       ave_atten_bit2+=-(pwr_mag[i][2]-mag0[i]);
       ave_atten_bit3+=-(pwr_mag[i][4]-mag0[i]);
-    }
-    ave_timedelay_diff=ave_timedelay_diff/(double)num_freqs;
-    ave_delay_bit1=ave_delay_bit1/(double)num_freqs;
-    ave_delay_bit2=ave_delay_bit2/(double)num_freqs;
-    ave_delay_bit3=ave_delay_bit3/(double)num_freqs;
-    ave_atten_diff=ave_atten_diff/(double)num_freqs;
-    ave_atten_bit1=ave_atten_bit1/(double)num_freqs;
-    ave_atten_bit2=ave_atten_bit2/(double)num_freqs;
-    ave_atten_bit3=ave_atten_bit3/(double)num_freqs;
-    var_timedelay_diff=0.0; 
-    var_atten_diff=0.0; 
-    stdev_delay_bit1=0.0;
-    stdev_delay_bit2=0.0;
-    stdev_delay_bit3=0.0;
-    stdev_atten_bit1=0.0;
-    stdev_atten_bit2=0.0;
-    stdev_atten_bit3=0.0;
-    for(i=0;i<num_freqs;i++) {
+     }
+     ave_timedelay_diff=ave_timedelay_diff/(double)num_freqs;
+     ave_delay_bit1=ave_delay_bit1/(double)num_freqs;
+     ave_delay_bit2=ave_delay_bit2/(double)num_freqs;
+     ave_delay_bit3=ave_delay_bit3/(double)num_freqs;
+     ave_atten_diff=ave_atten_diff/(double)num_freqs;
+     ave_atten_bit1=ave_atten_bit1/(double)num_freqs;
+     ave_atten_bit2=ave_atten_bit2/(double)num_freqs;
+     ave_atten_bit3=ave_atten_bit3/(double)num_freqs;
+     var_timedelay_diff=0.0; 
+     var_atten_diff=0.0; 
+     stdev_delay_bit1=0.0;
+     stdev_delay_bit2=0.0;
+     stdev_delay_bit3=0.0;
+     stdev_atten_bit1=0.0;
+     stdev_atten_bit2=0.0;
+     stdev_atten_bit3=0.0;
+     for(i=0;i<num_freqs;i++) {
       var_timedelay_diff+=pow(((measured_sum[i]-(timedelay[i][8191]))-ave_timedelay_diff),2.0);
       stdev_delay_bit1+=pow( ( (timedelay[i][1]-ave_delay0 )-ave_delay_bit1 ),2.0 );
       stdev_delay_bit2+=pow( ( (timedelay[i][2]-ave_delay0 )-ave_delay_bit2 ),2.0 );
@@ -302,21 +317,21 @@ int32_t main()
       stdev_atten_bit1+=pow( ( (pwr_mag[i][1]-mag0[i] )-ave_atten_bit1 ),2.0 );
       stdev_atten_bit2+=pow( ( (pwr_mag[i][2]-mag0[i] )-ave_atten_bit2 ),2.0 );
       stdev_atten_bit3+=pow( ( (pwr_mag[i][4]-mag0[i] )-ave_atten_bit3 ),2.0 );
-    }
-    var_timedelay_diff=sqrt(var_timedelay_diff/(double)num_freqs);
-    stdev_delay_bit1=sqrt(stdev_delay_bit1/(double)num_freqs);
-    stdev_delay_bit2=sqrt(stdev_delay_bit2/(double)num_freqs);
-    stdev_delay_bit3=sqrt(stdev_delay_bit3/(double)num_freqs);
-    var_atten_diff=sqrt(var_atten_diff/(double)num_freqs);
-    stdev_atten_bit1=sqrt(stdev_atten_bit1/(double)num_freqs);
-    stdev_atten_bit2=sqrt(stdev_atten_bit2/(double)num_freqs);
-    stdev_atten_bit3=sqrt(stdev_atten_bit3/(double)num_freqs);
-    printf("Ave Timedelay Diff: %lf (ns) StDev: %lf (ns)\n--------------\n",ave_timedelay_diff,var_timedelay_diff);
-    printf("Max Timedelay Diff: %lf (ns) at freq: %lf\n",max_timedelay_diff,freq[max_timedelay_index]);
-    i=max_timedelay_index;
-    fprintf(stdout,"Freq: %lf Code: %4d :: Expected(ns): %8.3lf Measured(ns): %8.3lf Ave(ns): %8.3lf : Corrected(ns): %8.3lf Mag: %8.3lf\n",
+     }
+     var_timedelay_diff=sqrt(var_timedelay_diff/(double)num_freqs);
+     stdev_delay_bit1=sqrt(stdev_delay_bit1/(double)num_freqs);
+     stdev_delay_bit2=sqrt(stdev_delay_bit2/(double)num_freqs);
+     stdev_delay_bit3=sqrt(stdev_delay_bit3/(double)num_freqs);
+     var_atten_diff=sqrt(var_atten_diff/(double)num_freqs);
+     stdev_atten_bit1=sqrt(stdev_atten_bit1/(double)num_freqs);
+     stdev_atten_bit2=sqrt(stdev_atten_bit2/(double)num_freqs);
+     stdev_atten_bit3=sqrt(stdev_atten_bit3/(double)num_freqs);
+     printf("Ave Timedelay Diff: %lf (ns) StDev: %lf (ns)\n--------------\n",ave_timedelay_diff,var_timedelay_diff);
+     printf("Max Timedelay Diff: %lf (ns) at freq: %lf\n",max_timedelay_diff,freq[max_timedelay_index]);
+     i=max_timedelay_index;
+     fprintf(stdout,"Freq: %lf Code: %4d :: Expected(ns): %8.3lf Measured(ns): %8.3lf Ave(ns): %8.3lf : Corrected(ns): %8.3lf Mag: %8.3lf\n",
       freq[i],0, 0.0,timedelay[i][0],ave_timedelay[0],ave_timedelay[0]-ave_delay0,pwr_mag[i][0]);
-    for(b=0;b<13;b++) {
+     for(b=0;b<13;b++) {
       index=(int32_t)pow(2,b);
         fprintf(stdout,"Freq: %lf Code: %4d :: Expected(ns): %8.3lf Measured(ns): %8.3lf Ave(ns): %8.3lf : Corrected(ns): %8.3lf Mag: %8.3lf\n",
           freq[i],index, expected_timedelays[b],timedelay[i][index],ave_timedelay[index],ave_timedelay[index]-ave_delay0,pwr_mag[i][index]);
@@ -324,13 +339,13 @@ int32_t main()
           fprintf(stdout,"Freq: %lf Code: %4d :: Expected(ns): %8.3lf Measured(ns): %8.3lf Ave(ns): %8.3lf : Corrected(ns): %8.3lf Mag: %8.3lf\n",
             freq[i],index+1, expected_timedelays[0]+expected_timedelays[b],timedelay[i][index+1],ave_timedelay[index+1],ave_timedelay[index+1]-ave_delay0,pwr_mag[i][index+1]);
         }
-    }
-    fprintf(stdout,"Freq: %lf Code: %4d :: Expected(ns): %8.3lf Measured(ns): %8.3lf Ave(ns): %8.3lf : Corrected(ns): %8.3lf Mag: %8.3lf\n",
+     }
+     fprintf(stdout,"Freq: %lf Code: %4d :: Expected(ns): %8.3lf Measured(ns): %8.3lf Ave(ns): %8.3lf : Corrected(ns): %8.3lf Mag: %8.3lf\n",
       freq[i],8191, expected_sum[i],timedelay[i][8191],ave_timedelay[8191],ave_timedelay[8191]-ave_delay0,pwr_mag[i][8191]);
-    printf("---------\n");
-    printf("Min Timedelay Diff: %lf (ns) at freq: %lf\n",min_timedelay_diff,freq[min_timedelay_index]);
-    i=min_timedelay_index;
-    for(b=0;b<13;b++) {
+     printf("---------\n");
+     printf("Min Timedelay Diff: %lf (ns) at freq: %lf\n",min_timedelay_diff,freq[min_timedelay_index]);
+     i=min_timedelay_index;
+     for(b=0;b<13;b++) {
       index=(int32_t)pow(2,b);
         fprintf(stdout,"Freq: %lf Code: %4d :: Expected(ns): %8.3lf Measured(ns): %8.3lf Ave(ns): %8.3lf : Corrected(ns): %8.3lf Mag: %8.3lf\n",
           freq[i],index, expected_timedelays[b],timedelay[i][index],ave_timedelay[index],ave_timedelay[index]-ave_delay0,pwr_mag[i][index]);
@@ -338,60 +353,63 @@ int32_t main()
           fprintf(stdout,"Freq: %lf Code: %4d :: Expected(ns): %8.3lf Measured(ns): %8.3lf Ave(ns): %8.3lf : Corrected(ns): %8.3lf Mag: %8.3lf\n",
             freq[i],index+1, expected_timedelays[0]+expected_timedelays[b],timedelay[i][index+1],ave_timedelay[index+1],ave_timedelay[index+1]-ave_delay0,pwr_mag[i][index+1]);
         }
-    }
-        fprintf(stdout,"Freq: %lf Code: %4d :: Expected(ns): %8.3lf Measured(ns): %8.3lf Ave(ns): %8.3lf : Corrected(ns): %8.3lf Mag: %8.3lf\n",
+     }
+     fprintf(stdout,"Freq: %lf Code: %4d :: Expected(ns): %8.3lf Measured(ns): %8.3lf Ave(ns): %8.3lf : Corrected(ns): %8.3lf Mag: %8.3lf\n",
           freq[i],8191, expected_sum[i],timedelay[i][8191],ave_timedelay[8191],ave_timedelay[8191]-ave_delay0,pwr_mag[i][8191]);
-    printf("---------\n");
+     printf("---------\n");
 
 
-    printf("Ave Atten Diff: %lf (db) StDev: %lf (db)\n--------------\n",ave_atten_diff,var_atten_diff);
-    printf("Max Atten Diff: %lf (db) at freq: %lf\n",max_atten_diff,freq[max_atten_index]);
-    i=max_atten_index;
+      printf("Ave Atten Diff: %lf (db) StDev: %lf (db)\n--------------\n",ave_atten_diff,var_atten_diff);
+      printf("Max Atten Diff: %lf (db) at freq: %lf\n",max_atten_diff,freq[max_atten_index]);
+      i=max_atten_index;
       for(b=0;b<13;b++) {
         index=(int32_t)pow(2,b);
       }
-    printf("Ave Timedelay Bit1: %lf (ns) StDev: %lf (ns)\n",ave_delay_bit1,stdev_delay_bit1);
-    printf("Ave Timedelay Bit2: %lf (ns) StDev: %lf (ns)\n",ave_delay_bit2,stdev_delay_bit2);
-    printf("Ave Timedelay Bit3: %lf (ns) StDev: %lf (ns)\n",ave_delay_bit3,stdev_delay_bit3);
+      printf("Ave Timedelay Bit1: %lf (ns) StDev: %lf (ns)\n",ave_delay_bit1,stdev_delay_bit1);
+      printf("Ave Timedelay Bit2: %lf (ns) StDev: %lf (ns)\n",ave_delay_bit2,stdev_delay_bit2);
+      printf("Ave Timedelay Bit3: %lf (ns) StDev: %lf (ns)\n",ave_delay_bit3,stdev_delay_bit3);
 
-    printf("Ave Atten Bit1: %lf (db) StDev: %lf (db)\n",ave_atten_bit1,stdev_atten_bit1);
-    printf("Ave Atten Bit2: %lf (db) StDev: %lf (db)\n",ave_atten_bit2,stdev_atten_bit2);
-    printf("Ave Atten Bit3: %lf (db) StDev: %lf (db)\n",ave_atten_bit3,stdev_atten_bit3);
+      printf("Ave Atten Bit1: %lf (db) StDev: %lf (db)\n",ave_atten_bit1,stdev_atten_bit1);
+      printf("Ave Atten Bit2: %lf (db) StDev: %lf (db)\n",ave_atten_bit2,stdev_atten_bit2);
+      printf("Ave Atten Bit3: %lf (db) StDev: %lf (db)\n",ave_atten_bit3,stdev_atten_bit3);
 
-    sprintf(filename,"%s/timedelay_cal_%s_%02d.dat",dirstub,radar_name,c);
-    timedelayfile=fopen(filename,"w+");
-    if (verbose > 1 ) fprintf(stdout,"Creating: %p %s\n",timedelayfile,filename); 
-    count=num_phasecodes;
-    fwrite(&count,sizeof(int32_t),1,timedelayfile);
-    count=MAX_CARDS;
-    fwrite(&count,sizeof(int32_t),1,timedelayfile);
-    count=num_freqs;
-    fwrite(&count,sizeof(int32_t),1,timedelayfile);
-    fwrite(&ave_delay0,sizeof(double),1,timedelayfile);
-    fwrite(&stdev_delay0,sizeof(double),1,timedelayfile);
-    count=0;
-    fwrite(freq,sizeof(double),num_freqs,timedelayfile);
-    count=fwrite(ave_timedelay,sizeof(double),num_phasecodes,timedelayfile);
-    for(i=0;i<num_freqs;i++) {
-      if (verbose > 1) fprintf(stdout,"Freq %lf:  Time_0:%lf Time_8191: %lf\n",freq[i],timedelay[i][0],timedelay[i][8191]);
-      fwrite(&i,sizeof(int32_t),1,timedelayfile);
-      count=fwrite(timedelay[i],sizeof(double),num_phasecodes,timedelayfile);
-      count=fwrite(pwr_mag[i],sizeof(double),num_phasecodes,timedelayfile);
-    }
-    if (verbose > 1 ) fprintf(stdout,"Closing timedelay File\n");
-    fclose(timedelayfile);
-    if(freq!=NULL) free(freq);
-    freq=NULL;
-    for(i=0;i<MAX_FREQS;i++) {
+      sprintf(filename,"%s/timedelay_cal_%s_%02d.dat",dirstub,radar_name,c);
+      timedelayfile=fopen(filename,"w+");
+      if (verbose > 1 ) fprintf(stdout,"Creating: %p %s\n",timedelayfile,filename); 
+      count=num_phasecodes;
+      fwrite(&count,sizeof(int32_t),1,timedelayfile);
+      count=MAX_CARDS;
+      fwrite(&count,sizeof(int32_t),1,timedelayfile);
+      count=num_freqs;
+      fwrite(&count,sizeof(int32_t),1,timedelayfile);
+      fwrite(&ave_delay0,sizeof(double),1,timedelayfile);
+      fwrite(&stdev_delay0,sizeof(double),1,timedelayfile);
+      count=0;
+      fwrite(freq,sizeof(double),num_freqs,timedelayfile);
+      count=fwrite(ave_timedelay,sizeof(double),num_phasecodes,timedelayfile);
+      for(i=0;i<num_freqs;i++) {
+        if (verbose > 1) fprintf(stdout,"Freq %lf:  Time_0:%lf Time_8191: %lf\n",freq[i],timedelay[i][0],timedelay[i][8191]);
+        fwrite(&i,sizeof(int32_t),1,timedelayfile);
+        count=fwrite(timedelay[i],sizeof(double),num_phasecodes,timedelayfile);
+        count=fwrite(pwr_mag[i],sizeof(double),num_phasecodes,timedelayfile);
+      }
+      if (verbose > 1 ) fprintf(stdout,"Closing timedelay File\n");
+      fclose(timedelayfile);
+      if(freq!=NULL) free(freq);
+      freq=NULL;
+      for(i=0;i<MAX_FREQS;i++) {
         if(phase[i]!=NULL) free(phase[i]);
         if(timedelay[i]!=NULL) free(timedelay[i]);
         if(pwr_mag[i]!=NULL) free(pwr_mag[i]);
         phase[i]=NULL;  
         pwr_mag[i]=NULL;
         timedelay[i]=NULL;
+      }
+      fflush(stdout);
+      fflush(stderr);
+    } else {
+      printf("calfile not opening\n");
     }
-    fflush(stdout);
-    fflush(stderr);
   }  // End card Loop
 //Summary stats
   printf("-------------------\n");
