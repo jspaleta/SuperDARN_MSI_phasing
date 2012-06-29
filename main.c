@@ -1275,7 +1275,7 @@ if(test_flag==-1000) {
       }
     }
   }
-/*
+
     printf("Programming all zeros attenuation coding\n");
     for (b=0;b<ATTENCODES;b++) {
       data=0;
@@ -1338,8 +1338,8 @@ if(test_flag==-1000) {
       if(NEW_PMAT) temp=verify_data_new(IOBASE,c,b,8191,radar,0);
       else temp=verify_data_old(IOBASE,c,b,8191,radar,0);
     }
-*/
-/*
+
+
     printf("Programming 1-to-1 phase coding no attenuation\n");
     for (b=0;b<PHASECODES;b++) {
       data=b;
@@ -1361,7 +1361,7 @@ if(test_flag==-1000) {
       if(NEW_PMAT) temp=verify_data_new(IOBASE,c,b,b,radar,0);
       else temp=verify_data_old(IOBASE,c,b,b,radar,0);
     }
-*/
+
 /*
     if(verbose> 0 ) {
       gettimeofday(&t3,NULL);
