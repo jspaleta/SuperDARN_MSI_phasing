@@ -31,7 +31,7 @@ ATTEN_VERIFY_SOURCES=atten_verifier.c
 ATTEN_VERIFY_OBJECTS=$(ATTEN_VERIFY_SOURCES:.c=.o)
 ATTEN_VERIFY_EXECUTABLE=atten_verifier
 
-VERIFY_PROGRAMMED_SOURCES=verify_programmed_beamcodes.c _open_PLX9050.c _prog_conventions.c utils.c 
+VERIFY_PROGRAMMED_SOURCES=verify_programmed_beamcodes.c common_functions.c _open_PLX9050.c _prog_conventions.c utils.c 
 VERIFY_PROGRAMMED_OBJECTS=$(VERIFY_PROGRAMMED_SOURCES:.c=.o)
 VERIFY_PROGRAMMED_EXECUTABLE=verify_programmed_beamcodes
 
