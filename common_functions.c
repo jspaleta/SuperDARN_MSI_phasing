@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <time.h>
+#include <math.h>
 #include "registers.h"
 
 /*-SET WRITE ENABLE BIT-------------------------------------------------------*/
