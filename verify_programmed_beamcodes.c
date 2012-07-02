@@ -71,14 +71,12 @@ int32_t main(int argc, char **argv)
   double freqs[MAX_FREQS];
   double angles[MAX_ANGLES];
   int32_t lowest_pwr_mag_index[3]={-1,-1,-1}; // freq,card,phasecode
-  int32_t *best_phasecode=NULL, *max_attencodes=NULL;
   double *max_pwr_mag=NULL;
-  int32_t *best_attencode[MAX_FREQS];
-  int32_t *final_beamcodes[CARDS], *final_attencodes[CARDS];
+  int32_t *final_phasecodes[CARDS], *final_attencodes[CARDS];
   double *final_angles[CARDS];
   double *final_freqs[CARDS];
   int32_t a=0,f=0,i=0,card=0,c=0,b=0,rval=0,count=0,attempt=0; 
-  int32_t num_freqs,num_angles,num_beamcodes,num_fsteps,fstep,foffset,num_cards;
+  int32_t num_freqs,max_angles,num_angles,num_beamcodes,num_fsteps,fstep,foffset,num_cards;
   double fextent=0.0,f0=0.0,fm=0.0,df=0.0,angle,freq,min_freq=MIN_FREQ,max_freq=MAX_FREQ;
   int32_t requested_phasecode=0, requested_attencode=0,beamcode=0;
   int32_t radar,loop=0,read=0;
@@ -89,13 +87,14 @@ int32_t main(int argc, char **argv)
   uint32_t	 mmap_io_ptr,IOBASE, CLOCK_RES;
   float		 time;
   int32_t tfreq=0,beamnm=0,best_fstep=0;
-  double  fdiff=0.,tdiff=0.,best_freq=0.;
+  double  fdiff=0.,tdiff=0.,best_angle=0.,best_freq=0.;
+  int32_t best_phasecode=0,best_attencode=0;
 #ifdef __QNX__
 	struct		 _clockperiod new, old;
 	struct		 timespec start_p, stop_p, start, stop, nsleep;
 #endif
   radar=0;
-  while ((opt = getopt(argc, argv, "n:c:l:f:b:rRh")) != -1) {
+  while ((opt = getopt(argc, argv, "n:c:lf:b:rRh")) != -1) {
     switch (opt) {
       case 'n':
         radar=atoi(optarg);
@@ -139,9 +138,6 @@ int32_t main(int argc, char **argv)
     caldir=strdup("/data/calibrations/");
   }
   fprintf(stdout,"CALDIR: %s\n",caldir);
-  for(i=0;i<MAX_FREQS;i++) {
-    best_attencode[i]=NULL;
-  } 
     printf("Loop: %d\n",loop);
     printf("\n\nEnter Radar Name: ");
     fflush(stdin);
@@ -230,12 +226,12 @@ int32_t main(int argc, char **argv)
 #endif
 
   for (c=0;c<CARDS;c++) {
-    final_beamcodes[c]=calloc(BEAMCODES,sizeof(int32_t));
+    final_phasecodes[c]=calloc(BEAMCODES,sizeof(int32_t));
     final_attencodes[c]=calloc(BEAMCODES,sizeof(int32_t));
     final_angles[c]=calloc(BEAMCODES,sizeof(double));
     final_freqs[c]=calloc(BEAMCODES,sizeof(double));
     for (b=0;b<BEAMCODES;b++) {
-      final_beamcodes[c][b]=-1;
+      final_phasecodes[c][b]=-1;
       final_attencodes[c][b]=-1;
       final_angles[c][b]=-1;
       final_freqs[c][b]=-1;
@@ -246,17 +242,20 @@ int32_t main(int argc, char **argv)
 
   if(read_table) {
       sprintf(filename,"%s/beamcode_lookup_table_%s.dat",dir,radar_name,c);
-      beamtablefile=fopen(filename,"r+");
+      beamtablefile=fopen(filename,"r");
       printf("%p %s\n",beamtablefile,filename);
       if(beamtablefile!=NULL) {
         printf("Reading from saved beamcode lookup table\n"); 
         fread(&num_freqs,sizeof(int32_t),1,beamtablefile);
         fread(&num_angles,sizeof(int32_t),1,beamtablefile);
         printf("Num angles: %d\n",num_angles);
+        fread(&max_angles,sizeof(int32_t),1,beamtablefile);
         fread(&num_beamcodes,sizeof(int32_t),1,beamtablefile);
         fread(&num_fsteps,sizeof(int32_t),1,beamtablefile);
+        printf("Num fsteps: %d\n",num_fsteps);
         fread(&fstep,sizeof(int32_t),1,beamtablefile);
         fread(&foffset,sizeof(int32_t),1,beamtablefile);
+        printf("Foffset: %d\n",foffset);
         fread(&f0,sizeof(double),1,beamtablefile);
         fread(&fm,sizeof(double),1,beamtablefile);
         fread(&num_cards,sizeof(int32_t),1,beamtablefile);
@@ -268,16 +267,16 @@ int32_t main(int argc, char **argv)
         printf("Counting saved codes in lookup table\n");
         for (c=0;c<CARDS;c++) { 
           count=0;
-          rval=fread(final_beamcodes[c],sizeof(int32_t),num_beamcodes,beamtablefile);
+          rval=fread(final_phasecodes[c],sizeof(int32_t),num_beamcodes,beamtablefile);
           rval=fread(final_attencodes[c],sizeof(int32_t),num_beamcodes,beamtablefile);
           rval=fread(final_freqs[c],sizeof(int32_t),num_beamcodes,beamtablefile);
           rval=fread(final_angles[c],sizeof(int32_t),num_beamcodes,beamtablefile);
           for (b=0;b<BEAMCODES;b++) {
-           if (final_beamcodes[c][b] >= 0 ) {
+           if (final_phasecodes[c][b] >= 0 ) {
               count++; 
             }
           }  
-          printf("Lookup Card: %d Count: %d\n",c,count);
+          //printf("Lookup Card: %d Count: %d\n",c,count);
         }
         fclose(beamtablefile);
         beamtablefile=NULL;
@@ -303,25 +302,6 @@ int32_t main(int argc, char **argv)
       printf("Radar: <%s>  All Cards\n",radar_name);
     }
   }
-/*
-  printf("\nExamining Beamcode lookup table\n");
-  c=card;
-  while((c<CARDS) && (c >=0)) {
-      printf("Card: %2d Beam: %2d Tfreq: %8d\n",c,beamnm,tfreq);
-      for (a=0;a<num_angles;a++) {
-        b=a;
-        printf("\nLegacy Beamcode - No Freq optimization\n");
-        printf("  Bcode: %6d Acode: %6d Freq %8.3lf\n" ,final_beamcodes[c][b] ,final_attencodes[c][b] ,final_freqs[c][b]);
-        printf("Freq Optimized Beamcodes \n");
-        for (f=0;f<num_fsteps;f++) {
-          b=f*num_fsteps+a+foffset;    
-          printf("  Bcode: %6d Acode: %6d Freq %8.3lf\n" ,final_beamcodes[c][b] ,final_attencodes[c][b] ,final_freqs[c][b]);
-        }
-      }
-      if(loop) c++;
-      else c=-1;
-  }
-*/
   c=card;
   while((c<CARDS) && (c >=0)) {
     if (tfreq > 0) {
@@ -329,70 +309,41 @@ int32_t main(int argc, char **argv)
       fdiff=fm;
       best_fstep=0;
       best_freq=0.0;
+      best_phasecode=0;
+      best_attencode=0;
       for (f=0;f<num_fsteps;f++) {
-        b=f*num_fsteps+a+foffset;    
+        b=f*max_angles+a+foffset;    
         tdiff=fabs(final_freqs[c][b]-(double)tfreq*1E3);
         if(tdiff < fdiff) {
           fdiff=tdiff;
           best_fstep=f;
           best_freq=final_freqs[c][b];
+          best_angle=final_angles[c][b];
+          best_phasecode=final_phasecodes[c][b];
+          best_attencode=final_attencodes[c][b];
           beamcode=b;
         }    
       }
-      printf("Card: %2d Beam: %6d Tfreq [Khz]: %8d :: Beamcode: %8d F[Mhz]: %8.3lf\n",c,beamnm,tfreq,beamcode,best_freq);
     } else {
       beamcode=beamnm;
+      b=beamnm;
       best_fstep=0.0;
-      printf("Card: %2d Beam: %6d Tfreq [Khz]: %8d :: Beamcode: %8d F[Mhz]: %8.3lf\n",c,beamnm,tfreq,beamcode,best_freq);
+      best_freq=final_freqs[c][b];
+      best_angle=final_angles[c][b];
+      best_phasecode=final_phasecodes[c][b];
+      best_attencode=final_attencodes[c][b];
     }
+    printf("Card: %2d Beam: %6d Tfreq [Khz]: %8d :: Beamcode: %8d :: Phase: %8d Atten: %2d F[Mhz]: %8.3lf A[deg]: %8.3lf\n",c,beamnm,tfreq,beamcode,best_phasecode,best_attencode,best_freq,best_angle);
     temp=beam_code(IOBASE,beamcode,radar);
+    if(NEW_PMAT) {
+      temp=verify_data_new(IOBASE,c,beamcode,best_phasecode,radar,0);
+      temp=verify_attenuators(IOBASE,c,beamcode,best_attencode,radar);
+    } else {
+
+    }
     if(loop) c++;
     else c=-1;
   }
-  c=card;
-  while((c<CARDS) && (c >=0)) {
-      if (read_matrix) {
-        printf("Verifying Beamcodes to Card: %d\n",c);
-        for (b=0;b<BEAMCODES;b++) {
-           if (final_beamcodes[c][b] >= 0 ) {
-             if(NEW_PMAT) {
-                beam_code(IOBASE,b,radar);
-                for(attempt=0;attempt<10;attempt++) {
-                  temp=verify_data_new(IOBASE,c,b,final_beamcodes[c][b],radar,0);
-                  if(temp<0) {
-                  //  printf("Verify Error: attempt: %d\n",attempt); 
-                    usleep(10);
-                  } else {
-                    break;
-                  }
-                } 
-                if(temp<0) {
-                  printf("EXIT on repeat Verify Errors\n");
-                  exit(temp); 
-                }
-                for(attempt=0;attempt<10;attempt++) {
-                  temp=verify_attenuators(IOBASE,c,b,final_attencodes[c][b],radar);
-                  if(temp<0) {
-                  //  printf("Verify Error: attempt: %d\n",attempt); 
-                    usleep(10);
-                  } else {
-                    break;
-                  }
-                } 
-                if(temp<0) {
-                  printf("EXIT on repeat Verify Attenuator Errors\n");
-                  exit(temp); 
-                }
-
-             } else {
-                //temp=write_data_old(IOBASE,c,beamcode,b,radar,0);
-             }
-          }
-        } //end beamcode loop 
-      } //end write if
-      if(loop) c++;
-      else c=-1;
-  } // end card loop
 //JDS write to lookup table
 }
 

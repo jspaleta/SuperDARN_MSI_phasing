@@ -106,6 +106,7 @@ int _open_PLX9052(int *pci_handle, unsigned int *mmap_io_ptr, int *interrupt_lin
 	}
 
 	*mmap_io_ptr=pci_reg.Base_Address_Regs[2]-1;
+
 	return 1;
 #else
  return 1;

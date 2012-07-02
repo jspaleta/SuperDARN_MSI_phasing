@@ -26,13 +26,6 @@
 #endif
 #include "registers.h"
 
-#define SWITCHES 0
-#define ATTEN    1
-#define READ     0
-#define WRITE    1
-#define ON       1
-#define OFF      0
-
 #define NEW_PMAT 1 
 #define write_to_matrix 0 
 #define read_lookup_table 1 
@@ -80,7 +73,7 @@ int32_t main(int argc, char **argv)
   double *final_angles[CARDS];
   double *final_freqs[CARDS];
   int32_t a=0,f=0,i=0,card=0,c=0,b=0,rval=0,count=0,attempt=0; 
-  int32_t num_freqs,num_angles,num_beamcodes,num_fsteps,fstep,foffset,num_cards;
+  int32_t num_freqs,max_angles,num_angles,num_beamcodes,num_fsteps,fstep,foffset,num_cards;
   double fextent=0.0,f0=0.0,fm=0.0,df=0.0,angle,freq,min_freq=MIN_FREQ,max_freq=MAX_FREQ;
   int32_t requested_phasecode=0, requested_attencode=0,beamcode=0;
   int32_t radar,loop=0,read=0;
@@ -252,6 +245,7 @@ int32_t main(int argc, char **argv)
         printf("Reading from saved beamcode lookup table\n"); 
         fread(&num_freqs,sizeof(int32_t),1,beamtablefile);
         fread(&num_angles,sizeof(int32_t),1,beamtablefile);
+        fread(&max_angles,sizeof(int32_t),1,beamtablefile);
         fread(&num_beamcodes,sizeof(int32_t),1,beamtablefile);
         fread(&num_fsteps,sizeof(int32_t),1,beamtablefile);
         fread(&fstep,sizeof(int32_t),1,beamtablefile);
@@ -349,7 +343,7 @@ int32_t main(int argc, char **argv)
 
         printf("  Freq  ::  Bmnum  ::  Ang   ::  Phasecode :: Attencode :: Pwr_mag\n");
         for(a=0;a<num_angles;a++) printf("%8.0lf :: %8d :: %6.1lf :: %8d :: %8d :: %6.2lf\n",freqs[0],a,angles[a],best_phasecode[a],max_attencodes[a],max_pwr_mag[a]);
- 
+        printf("\n"); 
         fclose(beamcodefile); //beamcode file
         read=1;
         printf("num_angles: %d \n", num_angles);
@@ -361,6 +355,7 @@ int32_t main(int argc, char **argv)
           final_freqs[c][b]=freq;
           final_angles[c][b]=angle;
         }
+        printf("  Freq  ::  Bmnum  ::  Ang   ::   Code  ::  Phasecode :: Attencode :: Pwr_mag\n");
         for(a=0;a<num_angles;a++) {
           if(a<MAX_ANGLES) {
             requested_phasecode=best_phasecode[a];
@@ -372,10 +367,11 @@ int32_t main(int argc, char **argv)
             final_attencodes[c][b]=requested_attencode;
             final_freqs[c][b]=freq;
             final_angles[c][b]=angle;
+            printf("%8.0lf :: %8d :: %6.1lf :: %8d :: %8d :: %8d :: %6.2lf\n",freq,a,angles[a],b,final_beamcodes[c][b],final_attencodes[c][b],max_pwr_mag[a]);
 
             for(f=0;f<MAX_FSTEPS;f++) {
               i=f*(int)df;
-              b= f*MAX_FSTEPS+a+foffset;
+              b=f*MAX_ANGLES+a+foffset;
               if(b<BEAMCODES) {
                 requested_phasecode=best_phasecode[a];
                 requested_attencode=best_attencode[i][a];
@@ -388,6 +384,7 @@ int32_t main(int argc, char **argv)
               final_attencodes[c][b]=requested_attencode;
               final_freqs[c][b]=freq;
               final_angles[c][b]=angle;
+              printf("%8.0lf :: %8d :: %6.1lf :: %8d :: %8d :: %8d :: %6.2lf\n",freq,a,angles[a],b,final_beamcodes[c][b],final_attencodes[c][b],max_pwr_mag[a]);
             }
           } else {
                 printf("angle out of bounds: a: %d\n",a);
@@ -412,8 +409,8 @@ int32_t main(int argc, char **argv)
                 for(attempt=0;attempt<10;attempt++) {
                   temp=verify_data_new(IOBASE,c,b,final_beamcodes[c][b],radar,0);
                   if(temp<0) {
-                 //   printf("Verify Error: attempt: %d\n",attempt); 
-                    usleep(10);
+                    printf("Verify Error: attempt: %d\n",attempt); 
+                    usleep(10000);
                   } else {
                     break;
                   }
@@ -427,7 +424,7 @@ int32_t main(int argc, char **argv)
                   temp=verify_attenuators(IOBASE,c,b,final_attencodes[c][b],radar);
                   if(temp<0) {
                  //   printf("Verify Error: attempt: %d\n",attempt); 
-                    usleep(10);
+                    usleep(10000);
                   } else {
                     break;
                   }
@@ -449,7 +446,7 @@ int32_t main(int argc, char **argv)
                     temp=verify_data_new(IOBASE,c,b,0,radar,0);
                     if(temp<0) {
                    //   printf("Verify Error: attempt: %d\n",attempt); 
-                    usleep(10);
+                    usleep(10000);
                     } else {
                       break;
                     }
@@ -463,7 +460,7 @@ int32_t main(int argc, char **argv)
                     temp=verify_attenuators(IOBASE,c,b,63,radar);
                     if(temp<0) {
                  //   printf("Verify Error: attempt: %d\n",attempt); 
-                      usleep(10);
+                      usleep(10000);
                     } else {
                       break;
                     }
@@ -491,7 +488,7 @@ int32_t main(int argc, char **argv)
                   temp=verify_data_new(IOBASE,c,b,final_beamcodes[c][b],radar,0);
                   if(temp<0) {
                   //  printf("Verify Error: attempt: %d\n",attempt); 
-                    usleep(10);
+                    usleep(10000);
                   } else {
                     break;
                   }
@@ -504,7 +501,7 @@ int32_t main(int argc, char **argv)
                   temp=verify_attenuators(IOBASE,c,b,final_attencodes[c][b],radar);
                   if(temp<0) {
                   //  printf("Verify Error: attempt: %d\n",attempt); 
-                    usleep(10);
+                    usleep(10000);
                   } else {
                     break;
                   }
@@ -533,6 +530,8 @@ int32_t main(int argc, char **argv)
         temp=num_freqs;
         fwrite(&temp,sizeof(int32_t),1,beamtablefile);
         temp=num_angles;
+        fwrite(&temp,sizeof(int32_t),1,beamtablefile);
+        temp=MAX_ANGLES;
         fwrite(&temp,sizeof(int32_t),1,beamtablefile);
         temp=BEAMCODES;
         fwrite(&temp,sizeof(int32_t),1,beamtablefile);

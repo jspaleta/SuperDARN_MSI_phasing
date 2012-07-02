@@ -1,7 +1,22 @@
 #include <stdint.h>
+#include <stdio.h>
 #include <time.h>
 #include <math.h>
+#ifdef __QNX__
+  #include <hw/pci.h>
+  #include <hw/inout.h>
+  #include <sys/neutrino.h>
+  #include <sys/mman.h>
+#endif
+
 #include "registers.h"
+
+#define SWITCHES 0
+#define ATTEN    1
+#define READ     0
+#define WRITE    1
+#define ON       1
+#define OFF      0
 
 /*-SET WRITE ENABLE BIT-------------------------------------------------------*/
 int32_t set_WE(int32_t base,int32_t onoff,int32_t radar){
@@ -326,7 +341,7 @@ int32_t write_attenuators(uint32_t base, int32_t card, int32_t code, int32_t dat
         out8(base+cntrl1,0x13);
     // disable writing
         set_RW(base,READ,radar);
-        usleep(3);
+        usleep(3000);
     // verify written data
     // read PortA and PortB to see if EEPROM output is same as progammed
         temp=in8(base+portB);
@@ -390,7 +405,7 @@ int32_t verify_attenuators(uint32_t base, int32_t card, int32_t code, int32_t da
         set_SA(base,ATTEN,radar);
     // disable writing
         set_RW(base,READ,radar);
-        usleep(10);
+        usleep(10000);
     // verify written data
     // read PortA and PortB to see if EEPROM output is same as progammed
         temp=in8(base+portB);
@@ -460,7 +475,7 @@ int32_t verify_data_new(uint32_t base, int32_t card, int32_t code, int32_t data,
         out8(base+cntrl1,0x13);
     // disable writing
         set_RW(base,READ,radar);
-        usleep(10);
+        usleep(10000);
     // verify written data
     // read PortA and PortB to see if EEPROM output is same as progammed
         temp=in8(base+portB);
@@ -547,7 +562,7 @@ int32_t write_data_new(uint32_t base, int32_t card, int32_t code, int32_t data,i
         out8(base+cntrl1,0x13);
     // disable writing
         set_RW(base,READ,radar);
-        usleep(10);
+        usleep(10000);
     // verify written data
     // read PortA and PortB to see if EEPROM output is same as progammed
         temp=in8(base+portB);
