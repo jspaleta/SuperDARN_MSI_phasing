@@ -1,4 +1,5 @@
 #include <math.h>
+#include <string.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -6,6 +7,8 @@
 
 #define MAX_CARDS 20 
 #define MAX_FREQS 201 
+#define MIN_FREQ 8E6
+#define MAX_FREQ 20E6
 //#define MAX_FREQS 1201 
 #define MAX_PHASES 8192
 int32_t verbose=0;
@@ -20,7 +23,7 @@ int32_t main()
 {
   double *freq,*pwr_mag[MAX_FREQS],*ave_timedelay=NULL,*timedelay[MAX_FREQS];    
 //  int32_t best_phasecode[MAX_FREQS][MAX_ANGLES];
-  int32_t missing_card[MAX_CARDS],bad_card[MAX_CARDS];
+  int32_t missing_card[MAX_CARDS],bad_low_card[MAX_CARDS],bad_high_card[MAX_CARDS];
   int32_t b,c,i,ii,p,count;
   int32_t summary_freqs,summary_phases;
   int32_t num_freqs,num_phasecodes,num_cards,num_angles;
@@ -28,7 +31,11 @@ int32_t main()
   int32_t highest_time0_card; // card with highest time0 delay
   double highest_time0_value; // highest time0 delay in ns
   int32_t lowest_pwr_mag_index[3]={-1,-1,-1}; // freq,card,phasecode
-  double lowest_pwr_mag=1E10; // freq,card,phasecode
+  int32_t highest_pwr_mag_index[3]={-1,-1,-1}; // freq,card,phasecode
+  double lowest_pwr_mag=1E10; 
+  double highest_pwr_mag=-1E10; 
+  double lowest_pwr_freq=1E10; 
+  double highest_pwr_freq=-1E10; 
   double time_needed,angle,difference;
   double ave_delay0,stdev_delay0;
   char *caldir=NULL;
@@ -62,7 +69,8 @@ int32_t main()
   }
 
   for(c=0;c<MAX_CARDS;c++) {
-    bad_card[c]=0;
+    bad_low_card[c]=0;
+    bad_high_card[c]=0;
     missing_card[c]=1;
     sprintf(filename,"%s/timedelay_cal_%s_%02d.dat",dirstub,radar_name,c);
     timedelayfile=fopen(filename,"r");
@@ -77,7 +85,7 @@ int32_t main()
       if (num_cards != MAX_CARDS) fprintf(stderr,"FILE: %s  ERROR:  Wrong number of cards  %d %d\n",filename,num_cards,MAX_CARDS);
       fread(&num_freqs,sizeof(int32_t),1,timedelayfile);
       if (verbose>1) printf("Freqs: %d\n",num_freqs);
-      if (num_freqs != MAX_FREQS) fprintf(stderr,"FILE: %s  ERROR:  Wrong number of freqs  %d %d\n",filename,num_freqs,MAX_FREQS);
+      if (num_freqs != MAX_FREQS) fprintf(stderr,"FILE: %s  WARNING:  Mismatched number of freqs  %d %d\n",filename,num_freqs,MAX_FREQS);
       if (num_freqs>MAX_FREQS) {
         fprintf(stderr,"Too many stored frequencies...up the MAX_FREQS define!\n");
         exit(0);
@@ -129,13 +137,26 @@ int32_t main()
             highest_time0_value=ave_timedelay[0];
       }        
       for(i=0;i<num_freqs;i++) {
-        for (b=0;b<num_phasecodes;b++) {
-          if (pwr_mag[i][b]< -20.0) bad_card[c]=1;
-          if (pwr_mag[i][b]<lowest_pwr_mag) {
-            lowest_pwr_mag_index[0]=i;
-            lowest_pwr_mag_index[1]=c;
-            lowest_pwr_mag_index[2]=b;
-            lowest_pwr_mag=pwr_mag[i][b];
+        if(freq[i] > MIN_FREQ) {
+          if(freq[i] < MAX_FREQ) {
+            for (b=0;b<num_phasecodes;b++) {
+              if (pwr_mag[i][b]< -20.0) bad_low_card[c]=1;
+              if (pwr_mag[i][b]<lowest_pwr_mag) {
+                lowest_pwr_freq=freq[i];
+                lowest_pwr_mag_index[0]=i;
+                lowest_pwr_mag_index[1]=c;
+                lowest_pwr_mag_index[2]=b;
+                lowest_pwr_mag=pwr_mag[i][b];
+              }        
+              if (pwr_mag[i][b]>  30.0) bad_high_card[c]=1;
+              if (pwr_mag[i][b]> highest_pwr_mag) {
+                highest_pwr_freq=freq[i];
+                highest_pwr_mag_index[0]=i;
+                highest_pwr_mag_index[1]=c;
+                highest_pwr_mag_index[2]=b;
+                highest_pwr_mag=pwr_mag[i][b];
+              }
+            }
           }        
         }
       }
@@ -148,12 +169,16 @@ int32_t main()
   if (highest_time0_card >=0) {
         printf("Highest 0-Time Delay: %8.3lf card: %d\n",highest_time0_value,highest_time0_card);
   }
-  printf("Lowest Mag: %lf ",lowest_pwr_mag);
-  printf(" Index:: freq: %d card: %d phasecode: %d\n",
-     lowest_pwr_mag_index[0],lowest_pwr_mag_index[1],lowest_pwr_mag_index[2]);
+  printf("Lowest Mag:  %8.3lf ",lowest_pwr_mag);
+  printf(" Index:: freq: %6d (%8.3g) card: %6d phasecode: %6d\n",
+     lowest_pwr_mag_index[0],lowest_pwr_freq,lowest_pwr_mag_index[1],lowest_pwr_mag_index[2]);
+  printf("Highest Mag: %8.3lf ",highest_pwr_mag);
+  printf(" Index:: freq: %6d (%8.3g) card: %6d phasecode: %6d\n",
+     highest_pwr_mag_index[0],highest_pwr_freq,highest_pwr_mag_index[1],highest_pwr_mag_index[2]);
   printf("\n-------\n");
   for (c=0;c<MAX_CARDS;c++) {
-    if (bad_card[c]) printf("Card %d has low pwr\n",c);
+    if (bad_low_card[c]) printf("Card %d has low pwr\n",c);
+    if (bad_high_card[c]) printf("Card %d has high pwr\n",c);
     if (missing_card[c]) printf("Card %d information unprocessed\n",c);
   }
   sprintf(filename,"%s/timedelay_summary_%s.dat",dirstub,radar_name);

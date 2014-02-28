@@ -45,7 +45,7 @@ void write32(unsigned long BASE, unsigned long reg1, signed long val){
 char read08(unsigned long reg1){
 	unsigned long *reg;
 	signed char val;
-	reg=reg1;
+	reg=(unsigned long *)reg1;
 	val=(char)(*reg);
 	return val;
 }
@@ -53,7 +53,7 @@ char read08(unsigned long reg1){
 signed short read16(unsigned long reg1){
 	unsigned long *reg;
 	signed short val;
-	reg=reg1;
+	reg=(unsigned long *)reg1;
 	val=(short)*(reg);
 	return val;
 }
@@ -61,7 +61,7 @@ signed short read16(unsigned long reg1){
 long read32(unsigned long reg1){
 	unsigned long *reg;
 	signed long val;
-	reg=reg1;
+	reg=(unsigned long *)reg1;
 	val=(long)*(reg);
 	return val;
 }

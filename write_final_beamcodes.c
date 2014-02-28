@@ -28,17 +28,15 @@
 
 #define NEW_PMAT 1 
 #define write_to_matrix 0 
-#define read_lookup_table 1 
-#define write_lookup_table 0 
+#define read_lookup_table 0 
+#define write_lookup_table 0
 #define CARDS 20 
 #define PHASECODES 8192 
 #define BEAMCODES 8192 
 #define MAX_FREQS 1201 
 #define MAX_ANGLES 32 
-#define MAX_FSTEPS 16 
+#define MAX_FSTEPS 64 
 #define F_OFFSET 64 
-#define MIN_FREQ 11.9E6
-#define MAX_FREQ 12.1E6
 extern char *optarg;
 int32_t sock=-1;
 int32_t verbose=2;
@@ -63,18 +61,20 @@ int32_t main(int argc, char **argv)
   int read_table=read_lookup_table,write_table=write_lookup_table,read_matrix=0,write_matrix=write_to_matrix;
   char *caldir=NULL;
   double *pwr_mag[MAX_FREQS];
+  double *step_pwr_mag[MAX_FSTEPS];
+  int32_t *step_attencodes[MAX_FSTEPS];
+  int32_t *step_phasecodes[MAX_FSTEPS];
   double freqs[MAX_FREQS];
   double angles[MAX_ANGLES];
   int32_t lowest_pwr_mag_index[3]={-1,-1,-1}; // freq,card,phasecode
-  int32_t *best_phasecode=NULL, *max_attencodes=NULL;
-  double *max_pwr_mag=NULL;
-  int32_t *best_attencode[MAX_FREQS];
+  //int32_t *ave_phasecodes=NULL, *max_attencodes=NULL;
+  //double *max_pwr_mag=NULL;
   int32_t *final_beamcodes[CARDS], *final_attencodes[CARDS];
   double *final_angles[CARDS];
   double *final_freqs[CARDS];
-  int32_t a=0,f=0,i=0,card=0,c=0,b=0,rval=0,count=0,attempt=0; 
+  int32_t a=0,f=0,i=0,card=0,c=0,b=0,rval=0,count=0,attempt=0,index=0; 
   int32_t num_freqs,max_angles,num_angles,num_beamcodes,num_fsteps,fstep,foffset,num_cards;
-  double fextent=0.0,f0=0.0,fm=0.0,df=0.0,angle,freq,min_freq=MIN_FREQ,max_freq=MAX_FREQ;
+  double fextent=0.0,f0=0.0,fm=0.0,df=0.0,angle,freq,frequency_lo,frequency_hi;
   int32_t requested_phasecode=0, requested_attencode=0,beamcode=0;
   int32_t radar,loop=0,read=0;
   uint32_t portA0,portB0,portC0,cntrl0 ;
@@ -132,8 +132,10 @@ int32_t main(int argc, char **argv)
     caldir=strdup("/data/calibrations/");
   }
   fprintf(stdout,"CALDIR: %s\n",caldir);
-  for(i=0;i<MAX_FREQS;i++) {
-    best_attencode[i]=NULL;
+  for(f=0;f<MAX_FSTEPS;f++) {
+    step_attencodes[f]=NULL;
+    step_phasecodes[f]=NULL;
+    step_pwr_mag[f]=NULL;
   } 
     printf("Loop: %d\n",loop);
     printf("\n\nEnter Radar Name: ");
@@ -228,10 +230,10 @@ int32_t main(int argc, char **argv)
     final_angles[c]=calloc(BEAMCODES,sizeof(double));
     final_freqs[c]=calloc(BEAMCODES,sizeof(double));
     for (b=0;b<BEAMCODES;b++) {
-      final_beamcodes[c][b]=-1;
-      final_attencodes[c][b]=-1;
-      final_angles[c][b]=-1;
-      final_freqs[c][b]=-1;
+      final_beamcodes[c][b]=8191;
+      final_attencodes[c][b]=63;
+      final_angles[c][b]=-1000;
+      final_freqs[c][b]=-1000;
     }
   }
   fflush(stdout);
@@ -248,7 +250,7 @@ int32_t main(int argc, char **argv)
         fread(&max_angles,sizeof(int32_t),1,beamtablefile);
         fread(&num_beamcodes,sizeof(int32_t),1,beamtablefile);
         fread(&num_fsteps,sizeof(int32_t),1,beamtablefile);
-        fread(&fstep,sizeof(int32_t),1,beamtablefile);
+        fread(&df,sizeof(double),1,beamtablefile);
         fread(&foffset,sizeof(int32_t),1,beamtablefile);
         fread(&f0,sizeof(double),1,beamtablefile);
         fread(&fm,sizeof(double),1,beamtablefile);
@@ -296,8 +298,8 @@ int32_t main(int argc, char **argv)
   }
   c=card;
   while((c<CARDS) && (c >=0)) {
-      sprintf(filename,"%s%s_%s_%d%s",dir,beamfile_prefix,radar_name,c,file_ext);
-      printf("File: %s\n",filename);
+      sprintf(filename,"%s%s_%s_%02d%s",dir,beamfile_prefix,radar_name,c,file_ext);
+      printf("Card: %d File: %s\n",c,filename);
       beamcodefile=fopen(filename,"r");
       if(beamcodefile!=NULL) {
         fread(&temp,sizeof(int32_t),1,beamcodefile);
@@ -308,12 +310,8 @@ int32_t main(int argc, char **argv)
         fm=(double)freqs[num_freqs-1];
         f0=(double)freqs[0];
         fextent=fm-f0;
-        df=num_freqs/(double)MAX_FSTEPS;
         foffset=F_OFFSET; 
 
-        printf("freq 0: %g df: %lf\n",freqs[0],df);
-        printf("freq max: %g df: %lf\n",freqs[num_freqs-1],df);
-        printf("freq code offset: %d\n",foffset);
         fread(&temp,sizeof(int32_t),1,beamcodefile);
         if(temp!=num_angles && read) fprintf(stderr,"num_angles mismatch! %d %d\n",temp,num_angles); 
         num_angles=temp;
@@ -321,29 +319,55 @@ int32_t main(int argc, char **argv)
         fread(angles,sizeof(double),num_angles,beamcodefile);
         for(a=0;a<num_angles;a++) printf("%4.1lf ",angles[a]);
         printf("\n");
-        for(i=0;i<num_freqs;i++) {
-          if(best_attencode[i]!=NULL) free(best_attencode[i]);
-          best_attencode[i]=calloc(num_angles,sizeof(int32_t));
-          rval=fread(best_attencode[i],sizeof(int32_t),num_angles,beamcodefile);
-          if( rval!=num_angles) fprintf(stderr,"Error reading best attencodes for freq: %d :: %d %d\n",i,rval,num_angles);
-        }
-        if(best_phasecode!=NULL) free(best_phasecode);
-        best_phasecode=calloc(num_angles,sizeof(int32_t));
+        fread(&temp,sizeof(int32_t),1,beamcodefile);
+        if(temp!=num_fsteps && read) fprintf(stderr,"num_fsteps mismatch! %d %d\n",temp,num_fsteps); 
+        num_fsteps=temp;
+
+        df=(fm-f0)/(double)num_fsteps;
+
+        printf("Num fsteps: %d\n",num_fsteps);
+        printf("freq 0: %g df: %lf\n",freqs[0],df);
+        printf("freq max: %g df: %lf\n",freqs[num_freqs-1],df);
+        printf("freq code offset: %d\n",foffset);
+/*
         if(max_pwr_mag!=NULL) free(max_pwr_mag);
         max_pwr_mag=calloc(num_angles,sizeof(double));
         if(max_attencodes!=NULL) free(max_attencodes);
         max_attencodes=calloc(num_angles,sizeof(int32_t));
-        rval=fread(best_phasecode,sizeof(int32_t),num_angles,beamcodefile);
+        if(ave_phasecodes!=NULL) free(ave_phasecodes);
+        ave_phasecodes=calloc(num_angles,sizeof(int32_t));
         if( rval!=num_angles) fprintf(stderr,"Error reading best phasecodes :: %d %d\n",rval,num_angles);
         rval=fread(max_pwr_mag,sizeof(double),num_angles,beamcodefile);
         if( rval!=num_angles) fprintf(stderr,"Error reading max_pwr_mag :: %d %d\n",rval,num_angles);
         rval=fread(max_attencodes,sizeof(int32_t),num_angles,beamcodefile);
         if( rval!=num_angles) fprintf(stderr,"Error reading max_attencodes :: %d %d\n",rval,num_angles);
-
-
-        printf("  Freq  ::  Bmnum  ::  Ang   ::  Phasecode :: Attencode :: Pwr_mag\n");
-        for(a=0;a<num_angles;a++) printf("%8.0lf :: %8d :: %6.1lf :: %8d :: %8d :: %6.2lf\n",freqs[0],a,angles[a],best_phasecode[a],max_attencodes[a],max_pwr_mag[a]);
+        rval=fread(ave_phasecodes,sizeof(int32_t),num_angles,beamcodefile);
+        if( rval!=num_angles) fprintf(stderr,"Error reading ave_phasecodes :: %d %d\n",rval,num_angles);
+        printf("  Ave  ::  Bmnum  ::  Ang   ::  Phasecode :: Attencode :: Pwr_mag\n");
+        for(a=0;a<num_angles;a++) printf("  AVE  :: %8d :: %6.1lf :: %8d :: %8d :: %6.2lf\n",a,angles[a],ave_phasecodes[a],max_attencodes[a],max_pwr_mag[a]);
         printf("\n"); 
+*/
+        for(f=0;f<=num_fsteps;f++) {
+          fread(&index,sizeof(int32_t),1,beamcodefile);
+          fread(&frequency_lo,sizeof(double),1,beamcodefile);
+          fread(&frequency_hi,sizeof(double),1,beamcodefile);
+
+          if(step_pwr_mag[f]!=NULL) free(step_pwr_mag[f]);
+          step_pwr_mag[f]=calloc(num_angles,sizeof(double));
+          if(step_attencodes[f]!=NULL) free(step_attencodes[f]);
+          step_attencodes[f]=calloc(num_angles,sizeof(int32_t));
+          if(step_phasecodes[f]!=NULL) free(step_phasecodes[f]);
+          step_phasecodes[f]=calloc(num_angles,sizeof(int32_t));
+          rval=fread(step_pwr_mag[f],sizeof(double),num_angles,beamcodefile);
+          if( rval!=num_angles) fprintf(stderr,"Error reading step_pwr_mag :: %d %d\n",rval,num_angles);
+          rval=fread(step_attencodes[f],sizeof(int32_t),num_angles,beamcodefile);
+          if( rval!=num_angles) fprintf(stderr,"Error reading step_attencodes :: %d %d\n",rval,num_angles);
+          rval=fread(step_phasecodes[f],sizeof(int32_t),num_angles,beamcodefile);
+          if( rval!=num_angles) fprintf(stderr,"Error reading step_phasecodes :: %d %d\n",rval,num_angles);
+          printf("  Step  ::  Bmnum  ::  Ang   ::  Phasecode :: Attencode :: Pwr_mag\n");
+          for(a=0;a<num_angles;a++) printf(" %6d :: %8d :: %6.1lf :: %8d :: %8d :: %6.2lf\n",f,a,angles[a],step_phasecodes[f][a],step_attencodes[f][a],step_pwr_mag[f][a]);
+          printf("\n"); 
+        }
         fclose(beamcodefile); //beamcode file
         read=1;
         printf("num_angles: %d \n", num_angles);
@@ -355,10 +379,22 @@ int32_t main(int argc, char **argv)
           final_freqs[c][b]=freq;
           final_angles[c][b]=angle;
         }
-        printf("  Freq  ::  Bmnum  ::  Ang   ::   Code  ::  Phasecode :: Attencode :: Pwr_mag\n");
+       /* Lets put some diagnostic codes in the upper memory */
+        final_beamcodes[c][8191]=8191;
+        final_attencodes[c][8191]=0;
+        final_beamcodes[c][8190]=0;
+        final_attencodes[c][8190]=0;
+        final_beamcodes[c][8189]=8191;
+        final_attencodes[c][8189]=63;
+        final_beamcodes[c][8188]=0;
+        final_attencodes[c][8188]=63;
+    
         for(a=0;a<num_angles;a++) {
+          printf("\n--------------------\n");
+          printf("  Freq   ::   Bmnum  ::  Ang   :: Beamcode ::   Pcode  ::   Acode  :: Pwr_mag\n");
           if(a<MAX_ANGLES) {
-            requested_phasecode=best_phasecode[a];
+/*
+            requested_phasecode=ave_phasecodes[a];
             requested_attencode=max_attencodes[a];
             angle=angles[a];
             freq=0;
@@ -368,23 +404,27 @@ int32_t main(int argc, char **argv)
             final_freqs[c][b]=freq;
             final_angles[c][b]=angle;
             printf("%8.0lf :: %8d :: %6.1lf :: %8d :: %8d :: %8d :: %6.2lf\n",freq,a,angles[a],b,final_beamcodes[c][b],final_attencodes[c][b],max_pwr_mag[a]);
-
-            for(f=0;f<MAX_FSTEPS;f++) {
-              i=f*(int)df;
-              b=f*MAX_ANGLES+a+foffset;
+*/
+            for(f=0;f<=num_fsteps;f++) {
+              if(f==0) {
+                b=a;
+                freq=0;
+              } else {
+                b=(f-1)*MAX_ANGLES+a+foffset;
+                freq=(df*(f-1))+freqs[0]+df/2.0;
+              } 
               if(b<BEAMCODES) {
-                requested_phasecode=best_phasecode[a];
-                requested_attencode=best_attencode[i][a];
+                requested_phasecode=step_phasecodes[f][a];
+                requested_attencode=step_attencodes[f][a];
                 angle=angles[a];
-                freq=freqs[i];
+                final_beamcodes[c][b]=requested_phasecode;
+                final_attencodes[c][b]=requested_attencode;
+                final_freqs[c][b]=freq;
+                final_angles[c][b]=angle;
+                printf("%8.0lf :: %8d :: %6.1lf :: %8d :: %8d :: %8d :: %6.2lf\n",freq,a,angles[a],b,final_beamcodes[c][b],final_attencodes[c][b],step_pwr_mag[f][a]);
               } else {
                 printf("beamcode out of bounds: f: %d a: %d b: %d\n",f,a,b);
               }
-              final_beamcodes[c][b]=requested_phasecode;
-              final_attencodes[c][b]=requested_attencode;
-              final_freqs[c][b]=freq;
-              final_angles[c][b]=angle;
-              printf("%8.0lf :: %8d :: %6.1lf :: %8d :: %8d :: %8d :: %6.2lf\n",freq,a,angles[a],b,final_beamcodes[c][b],final_attencodes[c][b],max_pwr_mag[a]);
             }
           } else {
                 printf("angle out of bounds: a: %d\n",a);
@@ -400,9 +440,9 @@ int32_t main(int argc, char **argv)
   c=card;
   while((c<CARDS) && (c >=0)) {
       if (write_matrix) {
-        printf("Writing Beamcodes to Card: %d\n",c);
+        fprintf(stdout,"Writing Beamcodes to Card: %d\n",c);
         for (b=0;b<BEAMCODES;b++) {
-         //printf("B: %d PhaseCode: %d AttenCode: %d\n",b,final_beamcodes[c][b],final_attencodes[c][b]); 
+         printf("B: %d PhaseCode: %d AttenCode: %d\n",b,final_beamcodes[c][b],final_attencodes[c][b]); 
            if (final_beamcodes[c][b] >= 0 ) {
               if(NEW_PMAT) {
                 temp=write_data_new(IOBASE,c,b,final_beamcodes[c][b],radar,0);
@@ -537,8 +577,8 @@ int32_t main(int argc, char **argv)
         fwrite(&temp,sizeof(int32_t),1,beamtablefile);
         temp=MAX_FSTEPS;
         fwrite(&temp,sizeof(int32_t),1,beamtablefile);
-        fstep=(int)df;
-        fwrite(&fstep,sizeof(int32_t),1,beamtablefile);
+        fstep=0.;
+        fwrite(&fstep,sizeof(double),1,beamtablefile);
         fwrite(&foffset,sizeof(int32_t),1,beamtablefile);
         fwrite(&f0,sizeof(double),1,beamtablefile);
         fwrite(&fm,sizeof(double),1,beamtablefile);
