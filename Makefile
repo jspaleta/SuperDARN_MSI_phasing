@@ -60,6 +60,10 @@ SUMMARY_SOURCES=summary_generator.c
 SUMMARY_OBJECTS=$(SUMMARY_SOURCES:.c=.o)
 SUMMARY_EXECUTABLE=summary_generator
 
+OPTBEAM_SOURCES=optimize_beam_programming.c 
+OPTBEAM_OBJECTS=$(OPTBEAM_SOURCES:.c=.o)
+OPTBEAM_EXECUTABLE=optimize_beam_programming
+
 FINAL_SOURCES=write_final_beamcodes.c  common_functions.c _open_PLX9050.c _prog_conventions.c utils.c 
 FINAL_OBJECTS=$(FINAL_SOURCES:.c=.o)
 FINAL_EXECUTABLE=write_final_beamcodes
@@ -148,6 +152,14 @@ ifeq ($(OS),Linux)
 endif
 ifeq ($(OS),QNX)
 	$(CC) -o $@ $(COMPARE_OBJECTS) $(common_libs) $(qnx_libs) 
+endif
+
+$(OPTBEAM_EXECUTABLE): $(OPTBEAM_OBJECTS)
+ifeq ($(OS),Linux)
+	$(CC) -o $@ $(OPTBEAM_OBJECTS) $(common_libs) $(linux_libs) 
+endif
+ifeq ($(OS),QNX)
+	$(CC) -o $@ $(OPTBEAM_OBJECTS) $(common_libs) $(qnx_libs) 
 endif
 
 $(BEAM_EXECUTABLE): $(BEAM_OBJECTS)
