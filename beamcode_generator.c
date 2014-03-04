@@ -25,7 +25,7 @@ FILE *summaryfile=NULL;
 FILE *beamcodefile=NULL;
 struct timeval t0,t1,t2,t3;
 unsigned long elapsed;
-double angles[MAX_ANGLES];
+double angles[MAX_ANGLES],angles_requested_delay[MAX_ANGLES],angles_needed_delay[MAX_ANGLES];
 int32_t attenfile_exists=0;
 
 double spacing=12.8016; //meters : MSI 42 feet == 12.8016 meters 
@@ -73,7 +73,7 @@ int32_t main()
   double best_atten_value;
   double best_pwr_mag;
   double *ave_timedelay;
-  double *beam_pwr_mag;
+  double *beam_pwr_mag, *beam_timedelay;
   int32_t *beam_attencode;
   int32_t *beam_phasecode;
   double ave_phasecode_td,best_phasecode_td,worst_phasecode_td,fallback_phasecode_td;
@@ -125,6 +125,7 @@ int32_t main()
   num_freqs=0;
   ave_timedelay=NULL;
   beam_pwr_mag=NULL;
+  beam_timedelay=NULL;
   beam_attencode=NULL;
   beam_atten_value=NULL;
   beam_phasecode=NULL;
@@ -278,6 +279,8 @@ int32_t main()
 
         if (beam_pwr_mag!=NULL) free(beam_pwr_mag);
         beam_pwr_mag=calloc(MAX_ANGLES,sizeof(double));
+        if (beam_timedelay!=NULL) free(beam_timedelay);
+        beam_timedelay=calloc(MAX_ANGLES,sizeof(double));
 
         if (beam_attencode!=NULL) free(beam_attencode);
         beam_attencode=calloc(MAX_ANGLES,sizeof(int32_t));
@@ -320,18 +323,39 @@ int32_t main()
         if (feof(timedelayfile)) printf("End of File! Read in: %d Freq points\n",data_count);
       }
       fclose(timedelayfile);
+      num_angles=NUM_ANGLES;
+      fprintf(stdout,"Card: %d num_angles: %d\n",c,num_angles);
+      for(b=0;b<num_angles;b++) {
+            angle=angles[b];
+            angles_needed_delay[b]=timedelay_needed(angle,spacing,c);
+            angles_requested_delay[b]=angles_needed_delay[b]+highest_time0_value;
+            fprintf(stdout,"  A: %04d : %8.3lf : Tn: %8.3g Tr: %8.3g\n",b,angles[b],angles_needed_delay[b],angles_requested_delay[b]);
+      }
+      fflush(stdout);
       sprintf(filename,"%s/beamcodes_cal_%s_%02d.dat",dirstub,radar_name,c);
       beamcodefile=fopen(filename,"w+");
       printf("%p %s\n",beamcodefile,filename); 
 
       if(USE_MEASURED_ATTENS && attenfile_exists) printf("Using measured Attenuations\n"); 
-      if (beamcodefile!=NULL) {
-        fwrite(&num_freqs,sizeof(int32_t),1,beamcodefile);
-        fwrite(freq,sizeof(double),num_freqs,beamcodefile);
 
-        num_angles=NUM_ANGLES;
+      if (beamcodefile!=NULL) {
+        /* Write Header information for this run */
+        /* This is the target t0 for all timedelay codes*/ 
+        fwrite(&highest_time0_value,sizeof(double),1,beamcodefile);
+        /* This is the target pwr mag for all atten codes*/ 
+        fwrite(&lowest_pwr_mag,sizeof(double),1,beamcodefile);
+        /* num_freqs is number of freqs used in the calibration*/
+        fwrite(&num_freqs,sizeof(int32_t),1,beamcodefile);
+        /* calibration freq array*/
+        fwrite(freq,sizeof(double),num_freqs,beamcodefile);
+        /* number of angles we are programming */
         fwrite(&num_angles,sizeof(int32_t),1,beamcodefile);
+        fwrite(&middle,sizeof(double),1,beamcodefile);
         fwrite(angles,sizeof(double),num_angles,beamcodefile);
+
+        fwrite(angles_requested_delay,sizeof(double),num_angles,beamcodefile);
+        fwrite(angles_needed_delay,sizeof(double),num_angles,beamcodefile);
+
         num_steps=MAX_FSTEPS;
         fwrite(&num_steps,sizeof(int32_t),1,beamcodefile);
 
@@ -354,6 +378,7 @@ int32_t main()
           for(b=0;b<num_angles;b++) {
             angle=angles[b];
             beam_pwr_mag[b]=-1E13;
+            beam_timedelay[b]=-1E13;
             beam_attencode[b]=-1;
             beam_phasecode[b]=-1;
             best_phasecode=-1;
@@ -472,6 +497,7 @@ int32_t main()
             }
             // if best_phasecode < 0 error out
             beam_phasecode[b]=best_phasecode; 
+            beam_timedelay[b]=best_phasecode_td; 
             ave_phasecode_td=best_phasecode_td; 
             p=best_phasecode; 
             needed_atten=best_needed_atten;
@@ -603,6 +629,7 @@ int32_t main()
           fwrite(&frequency_lo,sizeof(double),1,beamcodefile);
           fwrite(&frequency_hi,sizeof(double),1,beamcodefile);
           fwrite(beam_pwr_mag,sizeof(double),num_angles,beamcodefile);
+          fwrite(beam_timedelay,sizeof(double),num_angles,beamcodefile);
           fwrite(beam_attencode,sizeof(int32_t),num_angles,beamcodefile);
           fwrite(beam_phasecode,sizeof(int32_t),num_angles,beamcodefile);
         }  //freq step loop

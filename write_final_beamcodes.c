@@ -60,12 +60,16 @@ int32_t main(int argc, char **argv)
   int opt;
   int read_table=read_lookup_table,write_table=write_lookup_table,read_matrix=0,write_matrix=write_to_matrix;
   char *caldir=NULL;
+  double highest_time0_value=-1E13,lowest_pwr_mag=-1E13,middle=-1;
   double *pwr_mag[MAX_FREQS];
   double *step_pwr_mag[MAX_FSTEPS];
+  double *step_timedelay[MAX_FSTEPS];
   int32_t *step_attencodes[MAX_FSTEPS];
   int32_t *step_phasecodes[MAX_FSTEPS];
   double freqs[MAX_FREQS];
   double angles[MAX_ANGLES];
+  double angles_requested_delay[MAX_ANGLES];
+  double angles_needed_delay[MAX_ANGLES];
   int32_t lowest_pwr_mag_index[3]={-1,-1,-1}; // freq,card,phasecode
   //int32_t *ave_phasecodes=NULL, *max_attencodes=NULL;
   //double *max_pwr_mag=NULL;
@@ -74,7 +78,7 @@ int32_t main(int argc, char **argv)
   double *final_freqs[CARDS];
   int32_t a=0,f=0,i=0,card=0,c=0,b=0,rval=0,count=0,attempt=0,index=0; 
   int32_t num_freqs,max_angles,num_angles,num_beamcodes,num_fsteps,fstep,foffset,num_cards;
-  double fextent=0.0,f0=0.0,fm=0.0,df=0.0,angle,freq,frequency_lo,frequency_hi;
+  double fextent=0.0,f0=0.0,fm=0.0,df=0.0,angle,freq,frequency_lo[MAX_FSTEPS],frequency_hi[MAX_FSTEPS];
   int32_t requested_phasecode=0, requested_attencode=0,beamcode=0;
   int32_t radar,loop=0,read=0;
   uint32_t portA0,portB0,portC0,cntrl0 ;
@@ -302,6 +306,8 @@ int32_t main(int argc, char **argv)
       printf("Card: %d File: %s\n",c,filename);
       beamcodefile=fopen(filename,"r");
       if(beamcodefile!=NULL) {
+        fread(&highest_time0_value,sizeof(double),1,beamcodefile);
+        fread(&lowest_pwr_mag,sizeof(double),1,beamcodefile);
         fread(&temp,sizeof(int32_t),1,beamcodefile);
         if(temp!=num_freqs && read ) fprintf(stderr,"num_freq mismatch! %d %d\n",temp,num_freqs); 
         num_freqs=temp;
@@ -316,7 +322,10 @@ int32_t main(int argc, char **argv)
         if(temp!=num_angles && read) fprintf(stderr,"num_angles mismatch! %d %d\n",temp,num_angles); 
         num_angles=temp;
         printf("Num angles: %d\nAngles: ",num_angles);
+        fread(&middle,sizeof(double),1,beamcodefile);
         fread(angles,sizeof(double),num_angles,beamcodefile);
+        fread(angles_requested_delay,sizeof(double),num_angles,beamcodefile);
+        fread(angles_needed_delay,sizeof(double),num_angles,beamcodefile);
         for(a=0;a<num_angles;a++) printf("%4.1lf ",angles[a]);
         printf("\n");
         fread(&temp,sizeof(int32_t),1,beamcodefile);
@@ -329,36 +338,23 @@ int32_t main(int argc, char **argv)
         printf("freq 0: %g df: %lf\n",freqs[0],df);
         printf("freq max: %g df: %lf\n",freqs[num_freqs-1],df);
         printf("freq code offset: %d\n",foffset);
-/*
-        if(max_pwr_mag!=NULL) free(max_pwr_mag);
-        max_pwr_mag=calloc(num_angles,sizeof(double));
-        if(max_attencodes!=NULL) free(max_attencodes);
-        max_attencodes=calloc(num_angles,sizeof(int32_t));
-        if(ave_phasecodes!=NULL) free(ave_phasecodes);
-        ave_phasecodes=calloc(num_angles,sizeof(int32_t));
-        if( rval!=num_angles) fprintf(stderr,"Error reading best phasecodes :: %d %d\n",rval,num_angles);
-        rval=fread(max_pwr_mag,sizeof(double),num_angles,beamcodefile);
-        if( rval!=num_angles) fprintf(stderr,"Error reading max_pwr_mag :: %d %d\n",rval,num_angles);
-        rval=fread(max_attencodes,sizeof(int32_t),num_angles,beamcodefile);
-        if( rval!=num_angles) fprintf(stderr,"Error reading max_attencodes :: %d %d\n",rval,num_angles);
-        rval=fread(ave_phasecodes,sizeof(int32_t),num_angles,beamcodefile);
-        if( rval!=num_angles) fprintf(stderr,"Error reading ave_phasecodes :: %d %d\n",rval,num_angles);
-        printf("  Ave  ::  Bmnum  ::  Ang   ::  Phasecode :: Attencode :: Pwr_mag\n");
-        for(a=0;a<num_angles;a++) printf("  AVE  :: %8d :: %6.1lf :: %8d :: %8d :: %6.2lf\n",a,angles[a],ave_phasecodes[a],max_attencodes[a],max_pwr_mag[a]);
-        printf("\n"); 
-*/
+
         for(f=0;f<=num_fsteps;f++) {
           fread(&index,sizeof(int32_t),1,beamcodefile);
-          fread(&frequency_lo,sizeof(double),1,beamcodefile);
-          fread(&frequency_hi,sizeof(double),1,beamcodefile);
+          fread(&frequency_lo[f],sizeof(double),1,beamcodefile);
+          fread(&frequency_hi[f],sizeof(double),1,beamcodefile);
 
           if(step_pwr_mag[f]!=NULL) free(step_pwr_mag[f]);
           step_pwr_mag[f]=calloc(num_angles,sizeof(double));
+          if(step_timedelay[f]!=NULL) free(step_timedelay[f]);
+          step_timedelay[f]=calloc(num_angles,sizeof(double));
           if(step_attencodes[f]!=NULL) free(step_attencodes[f]);
           step_attencodes[f]=calloc(num_angles,sizeof(int32_t));
           if(step_phasecodes[f]!=NULL) free(step_phasecodes[f]);
           step_phasecodes[f]=calloc(num_angles,sizeof(int32_t));
           rval=fread(step_pwr_mag[f],sizeof(double),num_angles,beamcodefile);
+          if( rval!=num_angles) fprintf(stderr,"Error reading step_pwr_mag :: %d %d\n",rval,num_angles);
+          rval=fread(step_timedelay[f],sizeof(double),num_angles,beamcodefile);
           if( rval!=num_angles) fprintf(stderr,"Error reading step_pwr_mag :: %d %d\n",rval,num_angles);
           rval=fread(step_attencodes[f],sizeof(int32_t),num_angles,beamcodefile);
           if( rval!=num_angles) fprintf(stderr,"Error reading step_attencodes :: %d %d\n",rval,num_angles);
@@ -391,7 +387,7 @@ int32_t main(int argc, char **argv)
     
         for(a=0;a<num_angles;a++) {
           printf("\n--------------------\n");
-          printf("  Freq   ::   Bmnum  ::  Ang   :: Beamcode ::   Pcode  ::   Acode  :: Pwr_mag\n");
+          printf("      Freq MHz      ::   Bmnum  ::  Ang   :: Beamcode ::   Pcode  ::   Td    ::  Acode  :: Pwr_mag\n");
           if(a<MAX_ANGLES) {
 /*
             requested_phasecode=ave_phasecodes[a];
@@ -421,7 +417,8 @@ int32_t main(int argc, char **argv)
                 final_attencodes[c][b]=requested_attencode;
                 final_freqs[c][b]=freq;
                 final_angles[c][b]=angle;
-                printf("%8.0lf :: %8d :: %6.1lf :: %8d :: %8d :: %8d :: %6.2lf\n",freq,a,angles[a],b,final_beamcodes[c][b],final_attencodes[c][b],step_pwr_mag[f][a]);
+                printf("%8.4f - %8.4f :: %8d :: %6.1lf :: %8d :: %8d ::  %6.2lf :: %7d :: %6.2lf\n",
+                frequency_lo[f]/1E6,frequency_hi[f]/1E6,a,angles[a],b,final_beamcodes[c][b],step_timedelay[f][a],final_attencodes[c][b],step_pwr_mag[f][a]);
               } else {
                 printf("beamcode out of bounds: f: %d a: %d b: %d\n",f,a,b);
               }
