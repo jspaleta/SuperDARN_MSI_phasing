@@ -77,6 +77,9 @@ int main(int argc, char **argv ) {
      double td_min,td_max,td_pp;
      double pwr_min,pwr_max,pwr_pp;
      double adelta,tdelta;
+     double test_adelta,test_tdelta;
+     double asign,tsign;
+     int32_t count,wflag,acode_step,pcode_step;
      double fdiff,tdiff;
 
      int32_t nave,pcode_range,pcode_min,pcode_max;
@@ -264,7 +267,6 @@ int main(int argc, char **argv ) {
        printf("  Doing S2,1 Calibration..wait 4 seconds\n");
        sleep(4);
        button_command(sock,":SENS1:CORR:COLL:SAVE\r\n",10,verbose);
-       usleep(VNA_wait_delay_ms*1000); 
 
        button_command(sock,":SENS1:AVER ON\r\n",10,verbose);
        sprintf(command,":SENS1:AVER:COUN %d\r\n",VNA_triggers);
@@ -444,16 +446,71 @@ int main(int argc, char **argv ) {
                       fprintf(stdout,"        Needed tdelay: %13.4lf (ns) Ave tdelay: %13.4lf (ns)\n",needed_tdelay,td_ave*1E9); 
                       fprintf(stdout,"        Target Gain: %13.4lf (dB)   Ave Gain: %13.4lf (dB)\n",MSI_target_pwr_dB,pwr_ave); 
                     }
+
                     adelta=fabs(MSI_target_pwr_dB-pwr_ave);
-                    fprintf(stdout,"       Gain [dB] :: Target: %13.4lf Measured: %13.4lf :: Tol: %13.4lf\n",MSI_target_pwr_dB,pwr_ave,MSI_pwr_tolerance_dB); 
-                    if(adelta < MSI_pwr_tolerance_dB) {  
-                      fprintf(stdout,"        Optimizing attencode skipped\n",pcode_range); 
+                    if (adelta > 0) asign=(MSI_target_pwr_dB-pwr_ave)/adelta;
+                    else asign=1;
+                    /* First lets do an attempt at quick optimization */ 
+                    if(adelta <= MSI_pwr_tolerance_dB) {  
+                      fprintf(stdout,"        Optimizing attencode skipped\n"); 
                     } else {
-                      acode_range=2*MSI_attencode(adelta);
+                      test_adelta=adelta;
+                      count=0;
+                      wflag=1;
+                      ac=best_attencode;
+                      while(wflag==1) {
+                        count++;
+                        acode_range=MSI_attencode(adelta);
+                        pcode_step=asign*acode_range;
+                        ac=ac+acode_step;
+                        if (ac < 0 ) ac=0;
+                        if (ac > 63 ) ac=63;
+                        rval=take_data(sock,b,rnum,c,best_phasecode,ac,pwr_mag,phase,tdelay,sshflag,verbose);
+                        if(rval!=0) exit(rval);
+                        pwr_sum=0.0;
+                        nave=0; 
+                        for(i=0;i<VNA_FREQS;i++) {
+                          if((freq[i] >= freq_lo[f]) && (freq[i] <=freq_hi[f])){
+                            pwr_sum+=pwr_mag[i][b];
+                            nave++; 
+                          }
+                        }
+                        if(nave>0) {
+                          pwr_ave=pwr_sum/nave;
+                        } else {
+                          pwr_ave=-1E13;
+                        } 
+                        adelta=fabs(MSI_target_pwr_dB-pwr_ave);
+                        if (adelta > 0) asign=(MSI_target_pwr_dB-pwr_ave)/adelta;
+                        else asign=1;
+                        /* While Loop Test conditions */
+                        if (adelta <= test_adelta) {
+                          test_adelta=adelta;
+                          best_attencode=ac;
+                          best_pwr=pwr_ave;
+                        } else {
+                          fprintf(stderr," Info:: Gain error got worse %d! Move on to brute force\n",count);
+                          wflag=0; 
+                        }
+                        if (count > 8 ) {
+                          fprintf(stderr," Info:: Count limit reached %d. Move on to brute force. \n",count);
+                          wflag=0;
+                        }
+                        if(adelta <= MSI_pwr_tolerance_dB) {  
+                          fprintf(stderr," Info:: Reached Gain tolerance: %d. Skipping brute force.\n",count);
+                          wflag=0;
+                        }
+                      }
+                      adelta=test_adelta;
+                    }  
+                    fprintf(stdout,"       Gain [dB] :: Target: %13.4lf Measured: %13.4lf :: Tol: %13.4lf\n",MSI_target_pwr_dB,pwr_ave,MSI_pwr_tolerance_dB); 
+
+                    /* Brute force Optimization of attenuation */
+                    if(adelta > MSI_pwr_tolerance_dB) {  
+                      fprintf(stdout,"        Optimizing attencode.... %d measurements needed\n",acode_range); 
+                      acode_range=MSI_attencode(2*adelta);
                       acode_min=best_attencode-acode_range;
                       acode_max=best_attencode+acode_range;
-                      fprintf(stdout,"        Optimizing attencode.... %d measurements needed\n",acode_range); 
-
 		      if(acode_min < 0) acode_min=0; 
                       if(acode_max > 63) acode_max=63; 
                       for(ac=acode_min;ac<=acode_max;ac++) {
@@ -506,14 +563,78 @@ int main(int argc, char **argv ) {
                       fprintf(stdout,"        Needed tdelay: %13.4lf (ns) Ave tdelay: %13.4lf (ns)\n",needed_tdelay,td_ave*1E9); 
                       fprintf(stdout,"        Target Gain: %13.4lf (dB)   Ave Gain: %13.4lf (dB)\n",MSI_target_pwr_dB,pwr_ave); 
                     }
+
                     tdelta=fabs(needed_tdelay-td_ave*1E9);
+                    if (tdelta > 0) tsign=(needed_tdelay-td_ave*1E9)/tdelta;
+                    else tsign=1;
                     fprintf(stdout,"       Delay [ns] :: Target: %13.4lf Measured: %13.4lf :: Tol: %13.4lf\n",needed_tdelay,td_ave*1E9,MSI_tdelay_tolerance_nsec); 
-                    if(tdelta < MSI_tdelay_tolerance_nsec) {  
+
+                    /* First lets do an attempt at quick optimization */ 
+                    if(tdelta <= MSI_tdelay_tolerance_nsec) {  
                       fprintf(stdout,"        Optimizing phasecode skipped\n",pcode_range); 
                     } else {
-                      pcode_range=2*MSI_phasecode(tdelta);
-                      pcode_min=best_phasecode-pcode_range;
-                      pcode_max=best_phasecode+pcode_range;
+                      test_tdelta=tdelta;
+                      count=0;
+                      wflag=1;
+                      pc=best_phasecode;
+                      while(wflag==1) {
+                        count++;
+                        pcode_range=MSI_phasecode(tdelta);
+                        pcode_step=tsign*pcode_range;
+                        pc=pc+pcode_step;
+                        if (pc < 0 ) pc=0;
+                        if (pc > 8191 ) pc=8191;
+                        rval=take_data(sock,b,rnum,c,pc,best_attencode,pwr_mag,phase,tdelay,sshflag,verbose);
+                        if(rval!=0) exit(rval);
+                        td_sum=0.0;
+                        nave=0; 
+                        for(i=0;i<VNA_FREQS;i++) {
+                          if((freq[i] >= freq_lo[f]) && (freq[i] <=freq_hi[f])){
+                            td_sum+=tdelay[i][b];
+                            nave++; 
+                          }
+                        }
+                        if(nave>0) {
+                          td_ave=td_sum/nave;
+                        } else {
+                          td_ave=-1E13;
+                        } 
+                        tdelta=fabs(needed_tdelay-td_ave*1E9);
+                        if (tdelta > 0) tsign=(needed_tdelay-td_ave*1E9)/tdelta;
+                        else tsign=1;
+                        /* While Loop Test conditions */
+                        if (tdelta < test_tdelta) {
+                          test_tdelta=tdelta;
+                          best_phasecode=pc;
+                          best_tdelay=td_ave*1E9;
+                        } else {
+                          fprintf(stderr," Info:: Tdelay error got worse %d! Move on to brute force\n",count);
+                          wflag=0; 
+                        }
+                        if (count > 8 ) {
+                          fprintf(stderr," Info:: Count limit reached %d. Move on to brute force. \n",count);
+                          wflag=0;
+                        }
+                        if(test_tdelta <= MSI_tdelay_tolerance_nsec) {  
+                          fprintf(stderr," Info:: Reached Tdelay tolerance: %d. Skipping brute force.\n",count);
+                          wflag=0;
+                        }
+                      }
+                      tdelta=test_tdelta;
+                    }  
+                    /* Okay Brute Force optimization now */
+                    if(tdelta > MSI_tdelay_tolerance_nsec) {  
+                      pcode_range=MSI_phasecode(2*tdelta);
+                      if(needed_tdelay < td_ave*1E9) {
+                        pcode_min=best_phasecode-pcode_range;
+                        pcode_max=best_phasecode+1;
+                      } else {
+                        pcode_min=best_phasecode-1;
+                        pcode_max=best_phasecode+pcode_range;
+                      }
+
+		      if(pcode_min < 0) pcode_min=0; 
+                      if(pcode_max > 8191) pcode_max=8191; 
                       fprintf(stdout,"        Optimizing phasecode.... %d measurements needed\n",pcode_range); 
 
                       for(pc=pcode_min;pc<=pcode_max;pc++) {

@@ -140,7 +140,7 @@ int button_command(int sock, char *command,int wait_ms,int verbose) {
 int take_data(int sock,int b,int rnum,int c, int p,int a, double *pwr_mag[VNA_FREQS],double *phase[VNA_FREQS],double *tdelay[VNA_FREQS],int ssh_flag,int verbose){
   char diocmd[512]="";
   char fullcmd[512]="";
-  char diossh[512]="ssh root@host";
+  char diossh[512]="ssh root@azores-qnx.gi.alaska.edu";
   char diopost[512]="2>/dev/null 1>/dev/null";
   int t,rval;
   if( verbose > 2 ) fprintf(stdout,"Take Data: c:%d b:%d p:%d a:%d\n",c,b,p,a);
@@ -169,7 +169,6 @@ int take_data(int sock,int b,int rnum,int c, int p,int a, double *pwr_mag[VNA_FR
                       return 1;
   }
   fflush(stdout);
-  usleep(VNA_wait_delay_ms*1000);
 
   button_command(sock,":SENS1:AVER:CLE\r\n",30,verbose);
   for(t=0;t<VNA_triggers;t++) {
@@ -177,15 +176,12 @@ int take_data(int sock,int b,int rnum,int c, int p,int a, double *pwr_mag[VNA_FR
                       button_command(sock,"*OPC?\r\n",0,verbose);
   }
   button_command(sock,"DISP:WIND1:TRAC3:Y:AUTO\r\n",10,verbose);
-  usleep(VNA_wait_delay_ms*1000);
   button_command(sock,":CALC1:PAR3:SEL\r\n",10,verbose);
   mlog_data_command(sock,":CALC1:DATA:FDAT?\r\n",tdelay,b,verbose) ;
   button_command(sock,":CALC1:PAR1:SEL\r\n",10,verbose);
   mlog_data_command(sock,":CALC1:DATA:FDAT?\r\n",phase,b,verbose) ;
-  usleep(VNA_wait_delay_ms*1000);
   button_command(sock,":CALC1:PAR2:SEL\r\n",10,verbose);
   mlog_data_command(sock,":CALC1:DATA:FDAT?\r\n",pwr_mag,b,verbose) ;
-  usleep(VNA_wait_delay_ms*1000);
   return 0;
 }
 
