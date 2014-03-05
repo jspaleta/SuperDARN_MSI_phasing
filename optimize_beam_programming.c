@@ -42,6 +42,7 @@ extern double     MSI_pwr_tolerance_dB;
 
 extern int32_t    VNA_triggers;
 extern int32_t    VNA_wait_delay_ms;
+extern int32_t    VNA_min_nave;
 
 int main(int argc, char **argv ) {
      
@@ -431,13 +432,13 @@ int main(int argc, char **argv ) {
                         nave++; 
                       }
                     }
-                    if(nave>=5) {
+                    if(nave>=VNA_min_nave) {
                       td_ave=td_sum/nave;
                       pwr_ave=pwr_sum/nave;
                     } else {
                       td_ave=-1E13;
                       pwr_ave=-1E13;
-                      fprintf(stdout,"        Warning:: low nave: %d. Consider reconfiguring VNA or freq windows\n",nave);
+                      fprintf(stdout,"        Warning:: low nave: %d < desired: %d >. Consider reconfiguring VNA or freq windows\n",nave,VNA_min_nave);
                     }
                     if (verbose > 1 ){ 
                       fprintf(stdout,"        Needed tdelay: %13.4lf (ns) Ave tdelay: %13.4lf (ns)\n",needed_tdelay,td_ave*1E9); 

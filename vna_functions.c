@@ -7,6 +7,8 @@
 
 int32_t VNA_triggers=4;
 int32_t VNA_wait_delay_ms=10;
+int32_t VNA_min_nave=3;
+
 extern int32_t MSI_phasecodes;
 
 int mlog_data_command(int sock,char *command,double *array[VNA_FREQS],int b,int verbose) {
