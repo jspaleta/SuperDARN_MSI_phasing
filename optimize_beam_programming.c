@@ -446,6 +446,7 @@ int main(int argc, char **argv ) {
                     adelta=fabs(MSI_target_pwr_dB-pwr_ave);
                     acode_range=2*MSI_attencode(adelta);
                     fprintf(stdout,"        Optimizing attencode.... %d measurements needed\n",acode_range); 
+                    fprintf(stdout,"         Gain:: Target %13.41f Measured: %13.4lf\n",MSI_target_pwr_dB,pwr_ave); 
                     acode_min=best_attencode-acode_range;
                     acode_max=best_attencode+acode_range;
 		    if(acode_min < 0) acode_min=0; 
@@ -504,6 +505,7 @@ int main(int argc, char **argv ) {
                     pcode_max=best_phasecode+pcode_range;
 
                     fprintf(stdout,"        Optimizing phasecode.... %d measurements needed\n",pcode_range); 
+                    fprintf(stdout,"         Delay:: Target %13.41f Measured: %13.4lf\n",needed_tdelay,td_ave*1E9); 
 
                     for(pc=pcode_min;pc<=pcode_max;pc++) {
                       rval=take_data(sock,b,rnum,c,pc,best_attencode,pwr_mag,phase,tdelay,sshflag,verbose);
