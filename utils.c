@@ -9,7 +9,15 @@
 #include <stdlib.h>
 #include <string.h>
 
+void mypause ( void ) 
+{ 
+  fflush ( stdin );
+  printf ( "Press [Enter] to continue . . ." );
+  fflush ( stdout );
+  getchar();
+} 
 //#include "global_server_variables.h"
+
 
 int opentcpsock(char *hostip, int port){
 	//DECLARE VARIABLES FOR IP CONNECTIONS

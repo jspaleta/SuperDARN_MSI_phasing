@@ -1,0 +1,2 @@
+#define VNA_FREQS 201
+#define VNA_PHASECODES 8901 
