@@ -187,13 +187,6 @@ int button_command(char *command) {
       fflush(stdout);
   return 0;
 }
-void mypause ( void ) 
-{ 
-  fflush ( stdin );
-  printf ( "Press [Enter] to continue . . ." );
-  fflush ( stdout );
-  getchar();
-} 
 
 
 int main(int argc, char **argv)

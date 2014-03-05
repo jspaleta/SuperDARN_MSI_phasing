@@ -13,6 +13,7 @@
 #include <math.h>
 #include "MSI_functions.h"
 /* settings which I could probably move to an ini file */
+int32_t    MSI_phasecodes=8091;
 int32_t    MSI_num_angles=24;
 int32_t    MSI_num_cards=20;
 double     MSI_bm_sep_degrees=3.24;
