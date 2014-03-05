@@ -451,7 +451,6 @@ int main(int argc, char **argv ) {
                       acode_range=2*MSI_attencode(adelta);
                       acode_min=best_attencode-acode_range;
                       acode_max=best_attencode+acode_range;
-                      fprintf(stdout,"        Optimizing phasecode.... %d measurements needed\n",pcode_range); 
                       fprintf(stdout,"        Optimizing attencode.... %d measurements needed\n",acode_range); 
 
 		      if(acode_min < 0) acode_min=0; 
