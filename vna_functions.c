@@ -138,37 +138,9 @@ int button_command(int sock, char *command,int wait_ms,int verbose) {
 }
 
 int take_data(int sock,int b,int rnum,int c, int p,int a, double *pwr_mag[VNA_FREQS],double *phase[VNA_FREQS],double *tdelay[VNA_FREQS],int ssh_flag,int verbose){
-  char diocmd[512]="";
-  char fullcmd[512]="";
-  char diossh[512]="ssh root@azores-qnx.gi.alaska.edu";
-  char diopost[512]="2>/dev/null 1>/dev/null";
   int t,rval;
-  if( verbose > 2 ) fprintf(stdout,"Take Data: c:%d b:%d p:%d a:%d\n",c,b,p,a);
-  if (b>=MSI_phasecodes) {
-                     fprintf(stderr,"Bad memory address: %d\n",b);
-                      return 1;
-  }
-  sprintf(diocmd,"/root/operational_radar_code/write_card_memory -m %d -r %d -c %d -p %d -a %d",
-                            b,rnum,c,p,a);
-  if(ssh_flag!=0) sprintf(fullcmd,"%s '%s' %s",diossh,diocmd,diopost);
-  else sprintf(fullcmd,"%s %s",diocmd,diopost);
-  if( verbose > 1 ) fprintf(stdout,"Command: %s\n",fullcmd);
-  rval=system(fullcmd);
-  if(rval!=0) {
-                      fprintf(stderr,"Dio memory write error, exiting\n");
-                      return 1;
-  }
-  sprintf(diocmd,"/root/operational_radar_code/verify_card_memory -m %d -r %d -c %d -p %d -a %d",
-                            b,rnum,c,p,a);
-  if(ssh_flag!=0) sprintf(fullcmd,"%s '%s' %s",diossh,diocmd,diopost);
-  else sprintf(fullcmd,"%s %s",diocmd,diopost);
-  if( verbose > 1 ) fprintf(stdout,"Command: %s\n",fullcmd);
-  rval=system(fullcmd);
-  if(rval!=0) {
-                      fprintf(stderr,"Dio memory verify error, exiting\n");
-                      return 1;
-  }
-  fflush(stdout);
+  rval=MSI_dio_write_memory(b,rnum,c,p,a,ssh_flag,verbose);
+  if(rval!=0) return rval;
 
   button_command(sock,":SENS1:AVER:CLE\r\n",30,verbose);
   for(t=0;t<VNA_triggers;t++) {

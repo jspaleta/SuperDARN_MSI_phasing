@@ -12,7 +12,7 @@
 void mypause ( void ) 
 { 
   fflush ( stdin );
-  printf ( "Press [Enter] to continue . . ." );
+  fprintf (stdout, "Press [Enter] to continue . . .\n" );
   fflush ( stdout );
   getchar();
 } 

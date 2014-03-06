@@ -10,6 +10,8 @@
  *
  */
 
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -24,6 +26,7 @@
 #include "MSI_functions.h"
 
 /* variables defined elsewhere */
+extern int32_t    MSI_max_angles;
 extern int32_t    MSI_phasecodes;
 extern int32_t    MSI_num_angles;
 extern int32_t    MSI_num_cards;
@@ -79,7 +82,7 @@ int main(int argc, char **argv ) {
      double adelta,tdelta;
      double test_adelta,test_tdelta;
      double asign,tsign;
-     int32_t count,wflag,acode_step,pcode_step;
+     int32_t fast_loop,count,wflag,acode_step,pcode_step;
      double fdiff,tdiff;
 
      int32_t nave,pcode_range,pcode_min,pcode_max;
@@ -87,9 +90,10 @@ int main(int argc, char **argv ) {
 
  
      FILE *beamcodefile=NULL;
+     FILE *optbeamcodefile=NULL;
      char *caldir=NULL;
      char dirstub[256]="";
-     char filename[256]="";
+     char filename[512]="";
      char radar_name[16]="ade";
      char vna_host[24]="137.229.27.122";
      char strout[128]="";
@@ -112,6 +116,33 @@ int main(int argc, char **argv ) {
      int32_t     *beam_attencode=NULL;
      int32_t     *beam_phasecode=NULL;
      int32_t    beam_freq_index;
+
+/* 
+*  The optimized arrays are length MSI_phasecodes 
+*  and represent the final programming state of 
+*  the card
+*/ 
+     int32_t    opt_mem_offset=MSI_max_angles;
+/* code arrays are the final values */
+     int32_t     *opt_pcode=NULL;
+     int32_t     *opt_acode=NULL;
+     int32_t     *opt_qual=NULL;
+/* Freq and bm arrays used for self-checking and searching lookup table */ 
+     double     *opt_freq_lo=NULL;
+     double     *opt_freq_hi=NULL;
+     double     *opt_freq_center=NULL;
+     double     *opt_bmangle_deg=NULL;
+     int32_t     *opt_bmnum=NULL;
+/* tdelay and gain arrays used for self-checking of final programming */
+     double     *opt_tdelay_ave=NULL;
+     double     *opt_tdelay_target=NULL;
+     double     *opt_tdelay_min=NULL;
+     double     *opt_tdelay_max=NULL;
+     double     *opt_gain_ave=NULL;
+     double     *opt_gain_target=NULL;
+     double     *opt_gain_min=NULL;
+     double     *opt_gain_max=NULL;
+
 
      while ((rval = getopt (argc, argv, "+r:n:c:a:p:v:ish")) != -1) {
          switch (rval) {
@@ -167,9 +198,61 @@ int main(int argc, char **argv ) {
      }
      fprintf(stdout,"CALDIR: %s\n",caldir);
      printf("Radar: <%s>\n",radar_name);
-     fflush(stdout);
      sprintf(dirstub,"/%s/%s/",caldir,radar_name);
-
+     fprintf(stdout,"RADARDIR: %s\n",dirstub);
+     fflush(stdout);
+     struct stat s;
+     int err = stat(dirstub, &s);
+     if(-1 == err) {
+        perror("stat");
+        exit(1);
+     } else {
+       if(S_ISDIR(s.st_mode)) {
+        /* it's a dir */
+       } else {
+        /* exists but is no dir */
+        perror("stat");
+        exit(1);
+       }
+     }
+/* code arrays are the final values */
+     opt_pcode          =calloc(MSI_phasecodes,sizeof(int32_t));
+     opt_acode          =calloc(MSI_phasecodes,sizeof(int32_t));
+     opt_qual           =calloc(MSI_phasecodes,sizeof(int32_t));
+/* Freq and bm arrays used for self-checking and searching lookup table */ 
+     opt_freq_lo        =calloc(MSI_phasecodes,sizeof(double));
+     opt_freq_hi        =calloc(MSI_phasecodes,sizeof(double));
+     opt_freq_center    =calloc(MSI_phasecodes,sizeof(double));
+     opt_bmnum          =calloc(MSI_phasecodes,sizeof(int32_t));
+     opt_bmangle_deg    =calloc(MSI_phasecodes,sizeof(double));
+/* tdelay and atten arrays used for self-checking of final programming */
+     opt_tdelay_ave     =calloc(MSI_phasecodes,sizeof(double));
+     opt_tdelay_target  =calloc(MSI_phasecodes,sizeof(double));
+     opt_tdelay_min     =calloc(MSI_phasecodes,sizeof(double));
+     opt_tdelay_max     =calloc(MSI_phasecodes,sizeof(double));
+     opt_gain_ave       =calloc(MSI_phasecodes,sizeof(double));
+     opt_gain_target    =calloc(MSI_phasecodes,sizeof(double));
+     opt_gain_min       =calloc(MSI_phasecodes,sizeof(double));
+     opt_gain_max       =calloc(MSI_phasecodes,sizeof(double));
+/* Initialize the opt arrays with obviously bogus data */
+     for(b=0;b<MSI_phasecodes;b++) {
+       opt_pcode[b]=MSI_phasecodes-1;
+       opt_acode[b]=63;
+       opt_qual[b]=-1;
+       opt_bmnum[b]=-1;
+       opt_bmangle_deg[b]=180.;
+       opt_freq_lo[b]=0.0;
+       opt_freq_hi[b]=0.0;
+       opt_freq_center[b]=0.0;
+       opt_tdelay_ave[b]=-1E13;
+       opt_tdelay_target[b]=1E13;
+       opt_tdelay_min[b]=-1E13;
+       opt_tdelay_max[b]=-1E13;
+       opt_gain_ave[b]=1E13;
+       opt_gain_target[b]=-1E13;
+       opt_gain_min[b]=1E13;
+       opt_gain_max[b]=1E13;
+     }
      for(i=0;i<VNA_FREQS;i++) {
        freq[i]=MSI_min_freq+i*((MSI_max_freq-MSI_min_freq)/(double)(VNA_FREQS-1));
        phase[i]=calloc(MSI_phasecodes,sizeof(double));
@@ -198,7 +281,7 @@ int main(int argc, char **argv ) {
        freq_center[f]=(freq_hi[f]+freq_lo[f])/2.0;
        if (verbose > 2 ) fprintf(stdout,"%d %8.3lf %8.3lf %8.3lf\n",f,freq_lo[f],freq_center[f],freq_hi[f]);
      } 
-     if(freq_steps*32+MSI_num_angles > MSI_phasecodes) {
+     if(opt_mem_offset+(freq_steps*opt_mem_offset+MSI_num_angles) > MSI_phasecodes) {
             fprintf(stderr,"Overrun of Phasecode space: f: %d a: %d\n",freq_steps,MSI_num_angles);
             exit(1);
      } else {
@@ -206,14 +289,15 @@ int main(int argc, char **argv ) {
             fprintf(stdout,"Info:: Freq Steps: %d\n",freq_steps);
             loops_total=freq_steps*MSI_num_angles;
             fprintf(stdout,"Info:: Optimizations per card: %d\n",loops_total);
-            fprintf(stdout,"Info:: Max Card Memory Location: %d\n",freq_steps*32+MSI_num_angles);
+            fprintf(stdout,"Info:: Max Card Memory Location: %d\n",opt_mem_offset+(freq_steps*opt_mem_offset+MSI_num_angles));
      } 
      mypause();
      /* Initialize VNA */
      if (verbose>0) fprintf(stdout,"Opening Socket %s %d\n",vna_host,port);
      sock=opentcpsock(vna_host, port);
      if (sock < 0) {
-       if (verbose>0) fprintf(stderr,"Socket failure %d\n",sock);
+       fprintf(stderr,"Socket failure %d\n",sock);
+       exit(-1);
      } else if (verbose>0) fprintf(stdout,"Socket %d\n",sock);
      rval=read(sock, &output, sizeof(char)*10);
      if (verbose>0) fprintf(stdout,"Initial Output Length: %d\n",rval);
@@ -225,9 +309,9 @@ int main(int argc, char **argv ) {
        button_command(sock,":SYST:PRES\r\n",10,verbose);
        button_command(sock,":INIT1:CONT ON\r\n",10,verbose);
        button_command(sock,":TRIG:SOUR BUS\r\n",10,verbose);
-       sprintf(command,":SENS1:FREQ:STAR %E\r\n",MSI_min_freq);
+       sprintf(command,":SENS1:FREQ:STAR %E\r\n",VNA_MIN);
        button_command(sock,command,10,verbose);
-       sprintf(command,":SENS1:FREQ:STOP %E\r\n",MSI_max_freq);
+       sprintf(command,":SENS1:FREQ:STOP %E\r\n",VNA_MAX);
        button_command(sock,command,10,verbose);
        sprintf(command,":SENS1:SWE:POIN %d\r\n",VNA_FREQS);
        button_command(sock,command,10,verbose);
@@ -388,6 +472,7 @@ int main(int argc, char **argv ) {
                          tdiff=fabs(beam_needed_delay[ba]-timedelay_nsecs);
                     }  
                } 
+               if (verbose > -1 ) fprintf(stdout,"    -------\n");  
                if (verbose > -1 ) fprintf(stdout, "    Angle Index: %5d : %lf [deg] :: %8.4lf [nsec]\n",a,angles_degrees[a],timedelay_nsecs);
                for(f=0;f<freq_steps;f++) {
                     clock_gettime(CLOCK_MONOTONIC,&begin_step);
@@ -414,14 +499,17 @@ int main(int argc, char **argv ) {
                       best_phasecode=beam_phasecode[(best_beam_freq_index*num_beam_angles)+best_beam_angle_index];
                       best_attencode=beam_attencode[(best_beam_freq_index*num_beam_angles)+best_beam_angle_index];
                     }
+                    b=f*opt_mem_offset+a;
+                    if (f>0) b+=opt_mem_offset;
                     if (verbose > -1 ){ 
-                      fprintf(stdout, "      Optimize Start:: Freq Step: %5d : %-08.5e - %-08.5e [Hz]\n", f,freq_lo[f],freq_hi[f]);
-                      fprintf(stdout, "        Initial phasecode: %5d  acode: %5d\n",best_phasecode,best_attencode);
-                      fprintf(stdout, "        Initial tdelay: %lf [ns] atten: %lf [dB]\n",best_tdelay,best_pwr);
+                      fprintf(stdout,"      >>>>>>>\n");  
+                      fprintf(stdout,"      Optimize Start:: MemLoc: %5d Q: %5d Freq Step: %5d : %-08.5e - %-08.5e [Hz]\n", b,opt_qual[b],f,freq_lo[f],freq_hi[f]);
+                      fprintf(stdout,"        Initial phasecode: %5d  acode: %5d\n",best_phasecode,best_attencode);
+                      fprintf(stdout,"        Initial tdelay: %lf [ns] atten: %lf [dB]\n",best_tdelay,best_pwr);
                       fflush(stdout);
                     } 
+
                     /* Take a measurement at best phasecode and acode */
-                    b=f*32+a;
                     rval=take_data(sock,b,rnum,c,best_phasecode,best_attencode,pwr_mag,phase,tdelay,sshflag,verbose);
                     if(rval!=0) exit(rval);
                     td_sum=0.0;
@@ -446,182 +534,204 @@ int main(int argc, char **argv ) {
                       fprintf(stdout,"        Needed tdelay: %13.4lf (ns) Ave tdelay: %13.4lf (ns)\n",needed_tdelay,td_ave*1E9); 
                       fprintf(stdout,"        Target Gain: %13.4lf (dB)   Ave Gain: %13.4lf (dB)\n",MSI_target_pwr_dB,pwr_ave); 
                     }
-
-                    adelta=fabs(MSI_target_pwr_dB-pwr_ave);
-                    if (adelta > 0) asign=(MSI_target_pwr_dB-pwr_ave)/adelta;
-                    else asign=1;
-                    /* First lets do an attempt at quick optimization */ 
-                    if(adelta <= MSI_pwr_tolerance_dB) {  
-                      fprintf(stdout,"        Optimizing attencode skipped\n"); 
-                    } else {
-                      test_adelta=adelta;
-                      count=0;
-                      wflag=1;
-                      ac=best_attencode;
-                      while(wflag==1) {
-                        count++;
-                        acode_range=MSI_attencode(adelta);
-                        pcode_step=asign*acode_range;
-                        ac=ac+acode_step;
-                        if (ac < 0 ) ac=0;
-                        if (ac > 63 ) ac=63;
-                        rval=take_data(sock,b,rnum,c,best_phasecode,ac,pwr_mag,phase,tdelay,sshflag,verbose);
-                        if(rval!=0) exit(rval);
-                        pwr_sum=0.0;
-                        nave=0; 
-                        for(i=0;i<VNA_FREQS;i++) {
-                          if((freq[i] >= freq_lo[f]) && (freq[i] <=freq_hi[f])){
-                            pwr_sum+=pwr_mag[i][b];
-                            nave++; 
+                    fast_loop=0; 
+                    while(fast_loop < 3 ) {
+                      adelta=fabs(MSI_target_pwr_dB-pwr_ave);
+                      if (adelta > 0) asign=(MSI_target_pwr_dB-pwr_ave)/adelta;
+                      else asign=1;
+                      /* First lets do an attempt at quick optimization */ 
+                      if(adelta <= MSI_pwr_tolerance_dB) {  
+                        fprintf(stdout,"        Optimizing attencode skipped\n"); 
+                      } else {
+                        fprintf(stdout,"        Try fast attencode optimization....\n"); 
+                        test_adelta=adelta;
+                        count=0;
+                        wflag=1;
+                        ac=best_attencode;
+                        while(wflag==1) {
+                          count++;
+                          acode_range=MSI_attencode(adelta);
+                          acode_step=asign*acode_range;
+                          ac=ac-acode_step;
+                          if (ac < 0 ) ac=0;
+                          if (ac > 63 ) ac=63;
+                          rval=take_data(sock,b,rnum,c,best_phasecode,ac,pwr_mag,phase,tdelay,sshflag,verbose);
+                          if(rval!=0) exit(rval);
+                          pwr_sum=0.0;
+                          nave=0; 
+                          for(i=0;i<VNA_FREQS;i++) {
+                            if((freq[i] >= freq_lo[f]) && (freq[i] <=freq_hi[f])){
+                              pwr_sum+=pwr_mag[i][b];
+                              nave++; 
+                            }
                           }
-                        }
-                        if(nave>0) {
-                          pwr_ave=pwr_sum/nave;
-                        } else {
-                          pwr_ave=-1E13;
-                        } 
-                        adelta=fabs(MSI_target_pwr_dB-pwr_ave);
-                        if (adelta > 0) asign=(MSI_target_pwr_dB-pwr_ave)/adelta;
-                        else asign=1;
-                        /* While Loop Test conditions */
-                        if (adelta <= test_adelta) {
-                          test_adelta=adelta;
-                          best_attencode=ac;
-                          best_pwr=pwr_ave;
-                        } else {
-                          fprintf(stderr," Info:: Gain error got worse %d! Move on to brute force\n",count);
-                          wflag=0; 
-                        }
-                        if (count > 8 ) {
-                          fprintf(stderr," Info:: Count limit reached %d. Move on to brute force. \n",count);
-                          wflag=0;
-                        }
-                        if(adelta <= MSI_pwr_tolerance_dB) {  
-                          fprintf(stderr," Info:: Reached Gain tolerance: %d. Skipping brute force.\n",count);
-                          wflag=0;
-                        }
-                      }
-                      adelta=test_adelta;
-                    }  
-                    fprintf(stdout,"       Gain [dB] :: Target: %13.4lf Measured: %13.4lf :: Tol: %13.4lf\n",MSI_target_pwr_dB,pwr_ave,MSI_pwr_tolerance_dB); 
-
-                    /* Brute force Optimization of attenuation */
-                    if(adelta > MSI_pwr_tolerance_dB) {  
-                      fprintf(stdout,"        Optimizing attencode.... %d measurements needed\n",acode_range); 
-                      acode_range=MSI_attencode(2*adelta);
-                      acode_min=best_attencode-acode_range;
-                      acode_max=best_attencode+acode_range;
-		      if(acode_min < 0) acode_min=0; 
-                      if(acode_max > 63) acode_max=63; 
-                      for(ac=acode_min;ac<=acode_max;ac++) {
-                        rval=take_data(sock,b,rnum,c,best_phasecode,ac,pwr_mag,phase,tdelay,sshflag,verbose);
-                        if(rval!=0) exit(rval);
-                        pwr_sum=0.0;
-                        nave=0; 
-                        for(i=0;i<VNA_FREQS;i++) {
-                          if((freq[i] >= freq_lo[f]) && (freq[i] <=freq_hi[f])){
-                            pwr_sum+=pwr_mag[i][b];
-                            nave++; 
-                          }
-                        }
-                        if(nave>0) {
-                          pwr_ave=pwr_sum/nave;
-                        } else {
-                          pwr_ave=-1E13;
-                        }
-                        if(fabs(MSI_target_pwr_dB-pwr_ave) < adelta) {
+                          if(nave>0) {
+                            pwr_ave=pwr_sum/nave;
+                          } else {
+                            pwr_ave=-1E13;
+                          } 
                           adelta=fabs(MSI_target_pwr_dB-pwr_ave);
-                          best_attencode=ac;
-                          best_pwr=pwr_ave;
+                          if (adelta > 0) asign=(MSI_target_pwr_dB-pwr_ave)/adelta;
+                          else asign=1;
+                          /* While Loop Test conditions */
+                          if (adelta <= test_adelta) {
+                            test_adelta=adelta;
+                            best_attencode=ac;
+                            best_pwr=pwr_ave;
+                          } else {
+                            fprintf(stderr," Info:: Gain error got worse! %d :: best: %13.4lf current: %13.4lf\n",count,test_adelta,adelta);
+                          }
+                          if (count > 8 ) {
+                            fprintf(stderr," Info:: Count limit reached %d. Move on to brute force. \n",count);
+                            wflag=0;
+                          }
+                          if(adelta <= MSI_pwr_tolerance_dB) {  
+                            fprintf(stderr," Info:: Reached Gain tolerance: %d. Skipping brute force.\n",count);
+                            wflag=0;
+                          }
+                        }
+                        adelta=test_adelta;
+                      }   
+                      fprintf(stdout,"       Gain [dB] :: Target: %13.4lf Measured: %13.4lf :: Tol: %13.4lf\n",MSI_target_pwr_dB,pwr_ave,MSI_pwr_tolerance_dB); 
+
+                      /* Brute force Optimization of attenuation */
+                      if(adelta > MSI_pwr_tolerance_dB) {  
+                        fprintf(stdout,"        Optimizing attencode.... %d measurements needed\n",acode_range); 
+                        acode_range=MSI_attencode(2*adelta);
+                        acode_min=best_attencode-acode_range;
+                        acode_max=best_attencode+acode_range;
+		        if(acode_min < 0) acode_min=0; 
+                        if(acode_max > 63) acode_max=63; 
+                        for(ac=acode_min;ac<=acode_max;ac++) {
+                          rval=take_data(sock,b,rnum,c,best_phasecode,ac,pwr_mag,phase,tdelay,sshflag,verbose);
+                          if(rval!=0) exit(rval);
+                          pwr_sum=0.0;
+                          nave=0; 
+                          for(i=0;i<VNA_FREQS;i++) {
+                            if((freq[i] >= freq_lo[f]) && (freq[i] <=freq_hi[f])){
+                              pwr_sum+=pwr_mag[i][b];
+                              nave++; 
+                            }
+                          }
+                          if(nave>0) {
+                            pwr_ave=pwr_sum/nave;
+                          } else {
+                            pwr_ave=-1E13;
+                          }
+                          if(fabs(MSI_target_pwr_dB-pwr_ave) < adelta) {
+                            adelta=fabs(MSI_target_pwr_dB-pwr_ave);
+                            best_attencode=ac;
+                            best_pwr=pwr_ave;
+                          } 
                         } 
                       } 
-                    } 
-                    if (verbose > 1 ){ 
-                      fprintf(stdout,"        Optimized acode: %d %lf %lf\n",best_attencode,best_pwr,MSI_target_pwr_dB); 
-                    }
-
-                    rval=take_data(sock,b,rnum,c,best_phasecode,best_attencode,pwr_mag,phase,tdelay,sshflag,verbose);
-                    if(rval!=0) exit(rval);
-                    td_sum=0.0;
-                    pwr_sum=0.0;
-                    nave=0; 
-                    for(i=0;i<VNA_FREQS;i++) {
-                      if((freq[i] >= freq_lo[f]) && (freq[i] <=freq_hi[f])){
-                        td_sum+=tdelay[i][b];
-                        pwr_sum+=pwr_mag[i][b];
-                        nave++; 
+                      if (verbose > 1 ){ 
+                        fprintf(stdout,"        Optimized acode: %d %lf %lf\n",best_attencode,best_pwr,MSI_target_pwr_dB); 
                       }
-                    }
-                    if(nave>0) {
-                      td_ave=td_sum/nave;
-                      pwr_ave=pwr_sum/nave;
-                    } else {
-                      td_ave=-1E13;
-                      pwr_ave=-1E13;
-                    }
-                    if (verbose > 1 ){ 
-                      fprintf(stdout,"        Needed tdelay: %13.4lf (ns) Ave tdelay: %13.4lf (ns)\n",needed_tdelay,td_ave*1E9); 
-                      fprintf(stdout,"        Target Gain: %13.4lf (dB)   Ave Gain: %13.4lf (dB)\n",MSI_target_pwr_dB,pwr_ave); 
-                    }
 
-                    tdelta=fabs(needed_tdelay-td_ave*1E9);
-                    if (tdelta > 0) tsign=(needed_tdelay-td_ave*1E9)/tdelta;
-                    else tsign=1;
-                    fprintf(stdout,"       Delay [ns] :: Target: %13.4lf Measured: %13.4lf :: Tol: %13.4lf\n",needed_tdelay,td_ave*1E9,MSI_tdelay_tolerance_nsec); 
+                      rval=take_data(sock,b,rnum,c,best_phasecode,best_attencode,pwr_mag,phase,tdelay,sshflag,verbose);
+                      if(rval!=0) exit(rval);
+                      td_sum=0.0;
+                      pwr_sum=0.0;
+                      nave=0; 
+                      for(i=0;i<VNA_FREQS;i++) {
+                        if((freq[i] >= freq_lo[f]) && (freq[i] <=freq_hi[f])){
+                          td_sum+=tdelay[i][b];
+                          pwr_sum+=pwr_mag[i][b];
+                          nave++; 
+                        }
+                      }
+                      if(nave>0) {
+                        td_ave=td_sum/nave;
+                        pwr_ave=pwr_sum/nave;
+                      } else {
+                        td_ave=-1E13;
+                        pwr_ave=-1E13;
+                      }
+                      if (verbose > 1 ){ 
+                        fprintf(stdout,"        Needed tdelay: %13.4lf (ns) Ave tdelay: %13.4lf (ns)\n",needed_tdelay,td_ave*1E9); 
+                        fprintf(stdout,"        Target Gain: %13.4lf (dB)   Ave Gain: %13.4lf (dB)\n",MSI_target_pwr_dB,pwr_ave); 
+                      }
 
-                    /* First lets do an attempt at quick optimization */ 
-                    if(tdelta <= MSI_tdelay_tolerance_nsec) {  
-                      fprintf(stdout,"        Optimizing phasecode skipped\n",pcode_range); 
-                    } else {
-                      test_tdelta=tdelta;
-                      count=0;
-                      wflag=1;
-                      pc=best_phasecode;
-                      while(wflag==1) {
-                        count++;
-                        pcode_range=MSI_phasecode(tdelta);
-                        pcode_step=tsign*pcode_range;
-                        pc=pc+pcode_step;
-                        if (pc < 0 ) pc=0;
-                        if (pc > 8191 ) pc=8191;
-                        rval=take_data(sock,b,rnum,c,pc,best_attencode,pwr_mag,phase,tdelay,sshflag,verbose);
-                        if(rval!=0) exit(rval);
-                        td_sum=0.0;
-                        nave=0; 
-                        for(i=0;i<VNA_FREQS;i++) {
-                          if((freq[i] >= freq_lo[f]) && (freq[i] <=freq_hi[f])){
-                            td_sum+=tdelay[i][b];
-                            nave++; 
+                      tdelta=fabs(needed_tdelay-td_ave*1E9);
+                      if (tdelta > 0) tsign=(needed_tdelay-td_ave*1E9)/tdelta;
+                      else tsign=1;
+                      fprintf(stdout,"       Delay [ns] :: Target: %13.4lf Measured: %13.4lf :: Tol: %13.4lf\n",needed_tdelay,td_ave*1E9,MSI_tdelay_tolerance_nsec); 
+
+                      /* First lets do an attempt at quick optimization */ 
+                      if(tdelta <= MSI_tdelay_tolerance_nsec) {  
+                        fprintf(stdout,"        Optimizing phasecode skipped\n",pcode_range); 
+                      } else {
+                        fprintf(stdout,"        Try fast phasecode optimization....\n"); 
+                        test_tdelta=tdelta;
+                        test_adelta=adelta;
+                        count=0;
+                        wflag=1;
+                        pc=best_phasecode;
+                        while(wflag==1) {
+                          count++;
+                          pcode_range=MSI_phasecode(tdelta);
+                          pcode_step=tsign*pcode_range;
+                          pc=pc+pcode_step;
+                          if (pc < 0 ) pc=0;
+                          if (pc >= MSI_phasecodes  ) pc=MSI_phasecodes-1;
+                          rval=take_data(sock,b,rnum,c,pc,best_attencode,pwr_mag,phase,tdelay,sshflag,verbose);
+                          if(rval!=0) exit(rval);
+                          td_sum=0.0;
+                          pwr_sum=0.0;
+                          nave=0; 
+                          for(i=0;i<VNA_FREQS;i++) {
+                            if((freq[i] >= freq_lo[f]) && (freq[i] <=freq_hi[f])){
+                              td_sum+=tdelay[i][b];
+                              pwr_sum+=pwr_mag[i][b];
+                              nave++; 
+                            }
+                          }
+                          if(nave>0) {
+                            td_ave=td_sum/nave;
+                            pwr_ave=pwr_sum/nave;
+                          } else {
+                            td_ave=-1E13;
+                          } 
+                          tdelta=fabs(needed_tdelay-td_ave*1E9);
+                          if (tdelta > 0) tsign=(needed_tdelay-td_ave*1E9)/tdelta;
+                          else tsign=1;
+                          /* While Loop Test conditions */
+                          if (tdelta < test_tdelta) {
+                            test_tdelta=tdelta;
+                            test_adelta=fabs(MSI_target_pwr_dB-pwr_ave);
+                            best_pwr=pwr_ave;
+                            best_phasecode=pc;
+                            best_tdelay=td_ave*1E9;
+                            fprintf(stderr," Info:: New best Tdelay! %d :: best: %13.4lf code: %8d delta: %13.4E\n",count,best_tdelay,best_phasecode,test_tdelta);
+                          } else {
+                            fprintf(stderr," Info:: Tdelay error got worse! %d :: best: %13.4lf current: %13.4lf\n",count,test_tdelta,tdelta);
+                          }
+                          if (count > 8 ) {
+                            fprintf(stderr," Info:: Count limit reached %d. Move on to brute force. \n",count);
+                            wflag=0;
+                          }
+                          if(test_tdelta <= MSI_tdelay_tolerance_nsec) {  
+                            fprintf(stderr," Info:: Reached Tdelay tolerance: %d. Skipping brute force.\n",count);
+                            wflag=0;
                           }
                         }
-                        if(nave>0) {
-                          td_ave=td_sum/nave;
-                        } else {
-                          td_ave=-1E13;
-                        } 
-                        tdelta=fabs(needed_tdelay-td_ave*1E9);
-                        if (tdelta > 0) tsign=(needed_tdelay-td_ave*1E9)/tdelta;
-                        else tsign=1;
-                        /* While Loop Test conditions */
-                        if (tdelta < test_tdelta) {
-                          test_tdelta=tdelta;
-                          best_phasecode=pc;
-                          best_tdelay=td_ave*1E9;
-                        } else {
-                          fprintf(stderr," Info:: Tdelay error got worse %d! Move on to brute force\n",count);
-                          wflag=0; 
-                        }
-                        if (count > 8 ) {
-                          fprintf(stderr," Info:: Count limit reached %d. Move on to brute force. \n",count);
-                          wflag=0;
-                        }
-                        if(test_tdelta <= MSI_tdelay_tolerance_nsec) {  
-                          fprintf(stderr," Info:: Reached Tdelay tolerance: %d. Skipping brute force.\n",count);
-                          wflag=0;
-                        }
+                        tdelta=test_tdelta;
+                        adelta=test_adelta;
+                      }  
+                      fprintf(stdout,"          Fast Optimized pcode: %5d :: tdelay [ns]:: Measured: %13.4lf Needed: %13.4lf tdelta: %13.4lf\n",best_phasecode,best_tdelay,needed_tdelay,tdelta); 
+                      fprintf(stdout,"          Fast Optimized acode: %5d :: Gain   [dB]:: Measured: %13.4lf Needed: %13.4lf adelta: %13.4lf\n",best_attencode,best_pwr,MSI_target_pwr_dB,adelta,test_adelta); 
+                      if(adelta > MSI_pwr_tolerance_dB) {
+                        fprintf(stdout,"          Redo Fast Optimization: %d\n",fast_loop); 
+                        fast_loop++;
+                        continue;
+                      } else {
+                        break;
                       }
-                      tdelta=test_tdelta;
-                    }  
+                    }
+                    if(adelta > MSI_pwr_tolerance_dB) {
+                      exit(1);  
+                    }
                     /* Okay Brute Force optimization now */
                     if(tdelta > MSI_tdelay_tolerance_nsec) {  
                       pcode_range=MSI_phasecode(2*tdelta);
@@ -634,7 +744,7 @@ int main(int argc, char **argv ) {
                       }
 
 		      if(pcode_min < 0) pcode_min=0; 
-                      if(pcode_max > 8191) pcode_max=8191; 
+                      if(pcode_max >= MSI_phasecodes) pcode_max=MSI_phasecodes-1; 
                       fprintf(stdout,"        Optimizing phasecode.... %d measurements needed\n",pcode_range); 
 
                       for(pc=pcode_min;pc<=pcode_max;pc++) {
@@ -661,8 +771,6 @@ int main(int argc, char **argv ) {
                       } 
                     }
 
-                    fprintf(stdout,"          Optimized pcode: %5d :: tdelay [ns]:: Measured: %13.4lf Needed: %13.4lf\n",best_phasecode,best_tdelay,needed_tdelay); 
-                    fprintf(stdout,"          Optimized acode: %5d :: Gain   [dB]:: Measured: %13.4lf Needed: %13.4lf\n",best_attencode,best_pwr,MSI_target_pwr_dB); 
                     rval=take_data(sock,b,rnum,c,best_phasecode,best_attencode,pwr_mag,phase,tdelay,sshflag,verbose);
                     if(rval!=0) exit(rval);
                     td_sum=0.0;
@@ -694,24 +802,65 @@ int main(int argc, char **argv ) {
                       td_ave=-1E13;
                       pwr_ave=-1E13;
                     }
+                    best_tdelay=td_ave*1E9;
+                    best_pwr=pwr_ave;
+                    tdelta=fabs(needed_tdelay-best_tdelay);
+                    adelta=fabs(MSI_target_pwr_dB-best_pwr);
+
                     loops_done++;
                     clock_gettime(CLOCK_MONOTONIC,&end_step);
                     time_spent_step=(end_step.tv_sec-begin_step.tv_sec)+1E-9*(end_step.tv_nsec-begin_step.tv_nsec);
                     time_spent_card=(end_step.tv_sec-begin_card.tv_sec)+1E-9*(end_step.tv_nsec-begin_card.tv_nsec);
-                    fprintf(stdout, "        Optimize End:: Freq Step: %5d : %-08.5e - %-08.5e [Hz]\n", f,freq_lo[f],freq_hi[f]);
-                    fprintf(stdout, "          pcode: %d  acode %d\n",best_phasecode,best_attencode); 
-                    fprintf(stdout, "          Needed tdelay: %13.4lf (ns) Opt tdelay: %13.4lf (ns)\n",needed_tdelay,td_ave*1E9); 
-                    fprintf(stdout, "            tdelay [ns]:: Min: %13.4lf Max: %13.4lf P2P: %13.4lf\n",td_min*1E9,td_max*1E9,td_pp*1E9); 
-                    fprintf(stdout, "          Target Gain: %13.4lf (dB)   Opt Gain: %13.4lf (dB)\n",MSI_target_pwr_dB,pwr_ave); 
-                    fprintf(stdout, "            gain   [dB]:: Min: %13.4lf Max: %13.4lf P2P: %13.4lf\n",pwr_min,pwr_max,pwr_pp); 
-                    fprintf(stdout, "      Step Elapsed  :: %13.3lf\n", time_spent_step);
-                    fprintf(stdout, "      Card Elapsed  :: %13.3lf\n", time_spent_card);
-                    fprintf(stdout, "      Card Estimate :: %13.3lf\n", time_spent_card*loops_total/loops_done);
-                    
+                    fprintf(stdout,"          Optimized pcode: %5d :: tdelay [ns]:: Measured: %13.4lf Needed: %13.4lf\n",best_phasecode,best_tdelay,needed_tdelay); 
+                    fprintf(stdout,"          Optimized acode: %5d :: Gain   [dB]:: Measured: %13.4lf Needed: %13.4lf\n",best_attencode,best_pwr,MSI_target_pwr_dB); 
+
+                    if(opt_qual[b]!=-1) {
+                      fprintf(stdout,"Warning::: We are overwriting a memory location already used\n");
+                      fprintf(stdout,"           MemLoc: %5d Q: %5d Angle: %5d Freq Step: %5d : %-08.5e - %-08.5e [Hz]\n", b, opt_qual[b],a, f,opt_freq_lo[b],opt_freq_hi[b]);
+                      fprintf(stdout,"           tdelay [ns]:: Min: %13.4lf Max: %13.4lf Ave: %13.4lf\n",opt_tdelay_min[b],opt_tdelay_max[b],opt_tdelay_ave[b]);
+                      fprintf(stdout,"           gain   [dB]:: Min: %13.4lf Max: %13.4lf Ave: %13.4lf\n",opt_gain_min[b],opt_gain_max[b],opt_gain_ave[b]);
+                      mypause();
+                    }         
+
+                    opt_pcode[b]=best_phasecode;
+                    opt_acode[b]=best_attencode;
+                    opt_qual[b]=1;
+                    opt_freq_lo[b]=freq_lo[f];
+                    opt_freq_hi[b]=freq_hi[f];
+                    opt_freq_center[b]=freq_center[f];
+                    opt_tdelay_ave[b]=best_tdelay;
+                    opt_gain_ave[b]=best_pwr;
+                    opt_tdelay_max[b]=td_max*1E9;
+                    opt_gain_max[b]=pwr_max;
+                    opt_tdelay_min[b]=td_min*1E9;
+                    opt_gain_min[b]=pwr_min;
+                    opt_tdelay_target[b]=needed_tdelay;
+                    opt_gain_target[b]=MSI_target_pwr_dB;
+                    opt_bmnum[b]=a;
+                    opt_bmangle_deg[b]=angles_degrees[a];
+
+
+                    fprintf(stdout,"      -------\n");  
+                    fprintf(stdout,"      Optimize End:: MemLoc: %5d Q: %5d Angle: %5d Freq Step: %5d : %-08.5e - %-08.5e [Hz]\n", b,opt_qual[b],a, f,opt_freq_lo[b],opt_freq_hi[b]);
+                    fprintf(stdout,"          pcode: %d  acode %d\n",opt_pcode[b],opt_acode[b]); 
+                    fprintf(stdout,"          Needed tdelay: %13.4lf (ns) Opt tdelay: %13.4lf (ns) Delta: %13.4lf (ns)\n",opt_tdelay_target[b],opt_tdelay_ave[b],tdelta); 
+                    fprintf(stdout,"            tdelay [ns]:: Min: %13.4lf Max: %13.4lf P2P: %13.4lf\n",opt_tdelay_min[b],opt_tdelay_max[b],td_pp*1E9); 
+                    fprintf(stdout,"          Target   Gain: %13.4lf (dB)   Opt Gain: %13.4lf (dB) Delta: %13.4lf (dB)\n",opt_gain_target[b],opt_gain_ave[b],adelta); 
+                    fprintf(stdout,"            gain   [dB]:: Min: %13.4lf Max: %13.4lf P2P: %13.4lf\n",opt_gain_min[b],opt_gain_max[b],pwr_pp); 
+                    fprintf(stdout,"      <<<<<<<\n");  
+                    fprintf(stdout,"      Step Elapsed  :: %13.3lf\n", time_spent_step);
+                    fprintf(stdout,"      Card Elapsed  :: %13.3lf\n", time_spent_card);
+                    fprintf(stdout,"      Card Estimate :: %13.3lf\n", time_spent_card*loops_total/loops_done);
+                    if((adelta > MSI_pwr_tolerance_dB*1.5) || (tdelta > MSI_tdelay_tolerance_nsec*1.5)) {  
+                      opt_qual[b]=-2;
+                      fprintf(stdout,"Warning::: tolerance exceeded\n");
+                      mypause();
+                    } 
                }
                clock_gettime(CLOCK_MONOTONIC,&end_angle);
                time_spent_step=(end_angle.tv_sec-begin_angle.tv_sec)+1E-9*(end_angle.tv_nsec-begin_angle.tv_nsec);
                time_spent_card=(end_angle.tv_sec-begin_card.tv_sec)+1E-9*(end_angle.tv_nsec-begin_card.tv_nsec);
+               fprintf(stdout,"    -------\n");  
                fprintf(stdout, "    Angle Elapsed  :: %13.3lf\n", time_spent_angle);
                fprintf(stdout, "    Card Elapsed   :: %13.3lf\n", time_spent_card);
                fprintf(stdout, "    Card Estimate  :: %13.3lf\n", time_spent_card*loops_total/loops_done);
@@ -719,9 +868,121 @@ int main(int argc, char **argv ) {
           clock_gettime(CLOCK_MONOTONIC,&end_card);
           time_spent_card=(end_card.tv_sec-begin_card.tv_sec)+1E-9*(end_card.tv_nsec-begin_card.tv_nsec);
           fprintf(stdout, "  Card Elapsed   :: %13.3lf\n", time_spent_card);
+          /* Let's tag some upper memory values with diagnostic settings */
+          b=8191;
+          if (b >=MSI_phasecodes) {
+            fprintf(stderr,"Error! Selected bad MemLoc: %d (max: %d)\n",b,MSI_phasecodes-1);
+          } else {
+           
+            if(opt_qual[b]!=-1) {
+                      fprintf(stderr,"Warning::: We are overwriting a memory location already used\n");
+                      fprintf(stderr,"           Card: %5d MemLoc: %5d Q: %5d Angle: %5d Freq Step: %5d : %-08.5e - %-08.5e [Hz]\n", c, b, opt_qual[b],a, f,opt_freq_lo[b],opt_freq_hi[b]);
+                      fprintf(stderr,"           tdelay [ns]:: Min: %13.4lf Max: %13.4lf Ave: %13.4lf\n",opt_tdelay_min[b],opt_tdelay_max[b],opt_tdelay_ave[b]);
+                      fprintf(stderr,"           gain   [dB]:: Min: %13.4lf Max: %13.4lf Ave: %13.4lf\n",opt_gain_min[b],opt_gain_max[b],opt_gain_ave[b]);
+            }
+            opt_pcode[b]=8191;
+            opt_acode[b]=63;
+            opt_qual[b]=0;
+            b=8190;
+            if(opt_qual[b]!=-1) {
+                      fprintf(stderr,"Warning::: We are overwriting a memory location already used\n");
+                      fprintf(stderr,"           Card: %5d MemLoc: %5d Q: %5d Angle: %5d Freq Step: %5d : %-08.5e - %-08.5e [Hz]\n", c, b, opt_qual[b],a, f,opt_freq_lo[b],opt_freq_hi[b]);
+                      fprintf(stderr,"           tdelay [ns]:: Min: %13.4lf Max: %13.4lf Ave: %13.4lf\n",opt_tdelay_min[b],opt_tdelay_max[b],opt_tdelay_ave[b]);
+                      fprintf(stderr,"           gain   [dB]:: Min: %13.4lf Max: %13.4lf Ave: %13.4lf\n",opt_gain_min[b],opt_gain_max[b],opt_gain_ave[b]);
+            }
+            opt_pcode[b]=0;
+            opt_acode[b]=0;
+            opt_qual[b]=0;
+            b=8189;
+            if(opt_qual[b]!=-1) {
+                      fprintf(stderr,"Warning::: We are overwriting a memory location already used\n");
+                      fprintf(stderr,"           Card: %5d MemLoc: %5d Q: %5d Angle: %5d Freq Step: %5d : %-08.5e - %-08.5e [Hz]\n", c, b, opt_qual[b],a, f,opt_freq_lo[b],opt_freq_hi[b]);
+                      fprintf(stderr,"           tdelay [ns]:: Min: %13.4lf Max: %13.4lf Ave: %13.4lf\n",opt_tdelay_min[b],opt_tdelay_max[b],opt_tdelay_ave[b]);
+                      fprintf(stderr,"           gain   [dB]:: Min: %13.4lf Max: %13.4lf Ave: %13.4lf\n",opt_gain_min[b],opt_gain_max[b],opt_gain_ave[b]);
+            }
+            opt_pcode[b]=0;
+            opt_acode[b]=63;
+            opt_qual[b]=0;
+            b=8188;
+            if(opt_qual[b]!=-1) {
+                      fprintf(stderr,"Warning::: We are overwriting a memory location already used\n");
+                      fprintf(stderr,"           Card: %5d MemLoc: %5d Q: %5d Angle: %5d Freq Step: %5d : %-08.5e - %-08.5e [Hz]\n", c, b, opt_qual[b],a, f,opt_freq_lo[b],opt_freq_hi[b]);
+                      fprintf(stderr,"           tdelay [ns]:: Min: %13.4lf Max: %13.4lf Ave: %13.4lf\n",opt_tdelay_min[b],opt_tdelay_max[b],opt_tdelay_ave[b]);
+                      fprintf(stderr,"           gain   [dB]:: Min: %13.4lf Max: %13.4lf Ave: %13.4lf\n",opt_gain_min[b],opt_gain_max[b],opt_gain_ave[b]);
+            }
+            opt_pcode[b]=8191;
+            opt_acode[b]=0;
+            opt_qual[b]=0;
+          } 
+          /* Let's save these optimized settings to a file so we can reuse them */
+          sprintf(filename,"%s/optcodes_cal_%s_%02d.dat",dirstub,radar_name,c);
+          optbeamcodefile=fopen(filename,"w");
+          if (optbeamcodefile!=NULL) {
+            if (verbose > -1 ) fprintf(stdout,"    Writing Optimized values to file for card: %d\n",c);
+            if (verbose > -1 ) fprintf(stdout,"      Opened: %s\n",filename);
+            /* Length of the arrays */
+            fwrite(&MSI_phasecodes,  sizeof(int32_t),1,optbeamcodefile);
+            /* memory offset to start of narrow freq band */
+            fwrite(&opt_mem_offset,  sizeof(int32_t),1,optbeamcodefile);
+            /* Number of angles programmed*/
+            fwrite(&MSI_num_angles,  sizeof(int32_t),1,optbeamcodefile);
+            /* Number of freq steps programmed
+            *    freq_steps=(MSI_max_freq-MSI_min_freq)/MSI_freq_window+1;
+            *    first step is wide band average, 
+            *    sequent steps are narrow MSI_freq_window ave
+            */ 
+            fwrite(&freq_steps,      sizeof(int32_t),1,optbeamcodefile);
+            /* Min frequency considered */
+            fwrite(&MSI_min_freq,    sizeof(double),1,optbeamcodefile);
+            /* Min frequency considered */
+            fwrite(&MSI_max_freq,    sizeof(double),1,optbeamcodefile);
+            /* Narrow frequency window considered */
+            fwrite(&MSI_freq_window, sizeof(double),1,optbeamcodefile);
+
+            /* Now the arrays */
+            fwrite(opt_pcode,        sizeof(int32_t),MSI_phasecodes,optbeamcodefile);
+            fwrite(opt_acode,        sizeof(int32_t),MSI_phasecodes,optbeamcodefile);
+            fwrite(opt_qual,         sizeof(int32_t),MSI_phasecodes,optbeamcodefile);
+            fwrite(opt_bmnum,        sizeof(int32_t),MSI_phasecodes,optbeamcodefile);
+            fwrite(opt_bmangle_deg,  sizeof(double), MSI_phasecodes,optbeamcodefile);
+            fwrite(opt_freq_lo,      sizeof(double), MSI_phasecodes,optbeamcodefile);
+            fwrite(opt_freq_hi,      sizeof(double), MSI_phasecodes,optbeamcodefile);
+            fwrite(opt_freq_center,  sizeof(double), MSI_phasecodes,optbeamcodefile);
+            fwrite(opt_tdelay_ave,   sizeof(double), MSI_phasecodes,optbeamcodefile);
+            fwrite(opt_tdelay_target,sizeof(double), MSI_phasecodes,optbeamcodefile);
+            fwrite(opt_tdelay_min,   sizeof(double), MSI_phasecodes,optbeamcodefile);
+            fwrite(opt_tdelay_max,   sizeof(double), MSI_phasecodes,optbeamcodefile);
+            fwrite(opt_gain_ave,     sizeof(double), MSI_phasecodes,optbeamcodefile);
+            fwrite(opt_gain_target,  sizeof(double), MSI_phasecodes,optbeamcodefile);
+            fwrite(opt_gain_min,     sizeof(double), MSI_phasecodes,optbeamcodefile);
+            fwrite(opt_gain_max,     sizeof(double), MSI_phasecodes,optbeamcodefile);
+
+            fclose(optbeamcodefile);
+            optbeamcodefile=NULL;
+          } else {
+               fprintf(stdout,"    Warning::  Failed to Open: %s\n",filename);
+               mypause();
+          }
+          if (verbose > -1 ){ 
+            fprintf(stdout,"    ++++++++\n");  
+            fprintf(stdout,"    Writing Optimized values to card memory: %d\n",c);
+          }
+          for(b=0;b<MSI_phasecodes;b++) {
+            if(opt_qual[b]>=0) {
+              if (verbose > -1 ) {
+                      fprintf(stdout,"           Card: %5d MemLoc: %5d Q: %5d Bmnum: %5d Angle: %13.4lf [deg] Freq Range: %-08.5e - %-08.5e [Hz]\n", c, b, opt_qual[b],
+                               opt_bmnum[b],   opt_bmangle_deg[b],
+                               opt_freq_lo[b], opt_freq_hi[b]
+                     );
+                      fprintf(stdout,"             pcode: %5d :: tdelay [ns]:: Min: %-08.5e Max: %-08.5e Ave: %-08.5e\n",opt_pcode[b],opt_tdelay_min[b],opt_tdelay_max[b],opt_tdelay_ave[b]);
+                      fprintf(stdout,"             acode: %5d :: gain   [dB]:: Min: %-08.5e Max: %-08.5e Ave: %-08.5e\n",opt_acode[b],opt_gain_min[b],opt_gain_max[b],opt_gain_ave[b]);
+              }
+              rval=MSI_dio_write_memory(b,rnum,c,opt_pcode[b],opt_acode[b],sshflag,verbose);
+            }
+          }
+          if (verbose > -1 ){ 
+            fprintf(stdout,"    ########\n");  
+          }
      }
-
-
-
-  fprintf(stdout,"Hello Word\n");
+     return 0;
 }

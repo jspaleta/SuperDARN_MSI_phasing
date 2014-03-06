@@ -13,8 +13,9 @@
 #include <math.h>
 #include "MSI_functions.h"
 /* settings which I could probably move to an ini file */
-int32_t    MSI_phasecodes=8091;
+int32_t    MSI_phasecodes=8192;
 int32_t    MSI_num_angles=24;
+int32_t    MSI_max_angles=32;
 int32_t    MSI_num_cards=20;
 double     MSI_bm_sep_degrees=3.24;
 double     MSI_spacing_meters=12.8016;
@@ -23,11 +24,11 @@ double     MSI_min_freq=8E6;
 double     MSI_lo_freq=10E6;
 double     MSI_hi_freq=16E6;
 int32_t    MSI_max_freq_steps=128;
-double     MSI_freq_window=.25*1E6;
+double     MSI_freq_window=0.25*1E6;
 double     MSI_target_pwr_dB=-2.0;
 double     MSI_target_tdelay0_nsecs=10.0;
 double     MSI_tdelay_tolerance_nsec=3.0;
-double     MSI_pwr_tolerance_dB=1.5;
+double     MSI_pwr_tolerance_dB=1.0;
 
 
 /* Hardwired stuff */
@@ -107,5 +108,40 @@ double MSI_timedelay_needed(double angle_degrees,double spacing_meters,int32_t c
     fprintf(stderr,"Error in Time Needed Calc: %lf %lf\n",needed,deltat);
   }
   return needed;
+}
+int MSI_dio_write_memory(int b,int rnum,int c, int p,int a,int ssh_flag,int verbose){
+  char diocmd[512]="";
+  char fullcmd[512]="";
+  char diossh[512]="ssh root@azores-qnx.gi.alaska.edu";
+  char diopost[512]="2>/dev/null 1>/dev/null";
+  int rval;
+  if( verbose > 2 ) fprintf(stdout,"Take Data: c:%d b:%d p:%d a:%d\n",c,b,p,a);
+
+  if (b>=MSI_phasecodes) {
+                     fprintf(stderr,"Bad memory address: %d\n",b);
+                      return 1;
+  }
+  sprintf(diocmd,"/root/operational_radar_code/write_card_memory -m %d -r %d -c %d -p %d -a %d",
+                            b,rnum,c,p,a);
+  if(ssh_flag!=0) sprintf(fullcmd,"%s '%s' %s",diossh,diocmd,diopost);
+  else sprintf(fullcmd,"%s %s",diocmd,diopost);
+  if( verbose > 1 ) fprintf(stdout,"Command: %s\n",fullcmd);
+  rval=system(fullcmd);
+  if(rval!=0) {
+                      fprintf(stderr,"Dio memory write error, exiting\n");
+                      return 1;
+  }
+  sprintf(diocmd,"/root/operational_radar_code/verify_card_memory -m %d -r %d -c %d -p %d -a %d",
+                            b,rnum,c,p,a);
+  if(ssh_flag!=0) sprintf(fullcmd,"%s '%s' %s",diossh,diocmd,diopost);
+  else sprintf(fullcmd,"%s %s",diocmd,diopost);
+  if( verbose > 1 ) fprintf(stdout,"Command: %s\n",fullcmd);
+  rval=system(fullcmd);
+  if(rval!=0) {
+                      fprintf(stderr,"Dio memory verify error, exiting\n");
+                      return 1;
+  }
+  fflush(stdout);
+  return 0;
 }
 
