@@ -102,7 +102,7 @@ int main(int argc, char **argv ) {
      char output[128]="";
      char command[128]="";
      char diocmd[256]="";
-     int32_t sshflag=0,iflag=0,rflag=0,rnum=0,port=23;
+     int32_t sshflag=0,iflag=0,nflag=0,cflag=0,rflag=0,rnum=0,port=23;
 
      double beam_highest_time0_nsec,beam_lowest_pwr_dB,beam_middle;
      int32_t    num_beam_freqs,num_beam_angles,num_beam_steps;
@@ -156,10 +156,12 @@ int main(int argc, char **argv ) {
              break;
            case 'n':
              rnum=atoi(optarg);
+             nflag=1; 
              break;
            case 'c':
              first_card=atoi(optarg);
              last_card=atoi(optarg);
+             cflag=1;
              break;
            case 'p':
              port=atoi(optarg);
@@ -175,7 +177,7 @@ int main(int argc, char **argv ) {
              sshflag=1;
              break;
            case '?':
-             if (optopt == 'r')
+             if (optopt == 'r' || optopt =='c' || optopt =='n' || optopt=='p' || optopt=='a' || optopt=='v')
                fprintf (stderr, "Option -%c requires an argument.\n", optopt);
              else if (isprint (optopt))
                fprintf (stderr, "Unknown option `-%c'.\n", optopt);
@@ -186,12 +188,12 @@ int main(int argc, char **argv ) {
              return 1;
            case 'h':
            default:
-               fprintf (stderr,"-r radarname -n dio radar number -a 'ipaddress' -c to run vna cal\n");
+               fprintf (stderr,"Required:\n  -r radarname\n  -n dio radar number (1 or 2)\n  -c card number\nOptional:\n  -a vna ipaddress\n  -p vna tcp port\n  -i to run vna init and cal process\n  -v number to set verbose output level\n");
                return 1;
          }
      }
-     if (argc == 1 || rnum==0 || rflag==0) {
-               fprintf (stderr,"Required arguments -r radarname -n dio radar number\n");
+     if (argc == 1 || rnum==0 || rflag==0 || nflag==0||cflag==0) {
+               fprintf (stderr,"Required arguments -r radarname, -n dio radar number and -c card number\n Consult the help using the -h option\n");
                return 1;
      }
      caldir=getenv("MSI_CALDIR");
