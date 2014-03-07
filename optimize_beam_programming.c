@@ -219,6 +219,7 @@ int main(int argc, char **argv ) {
         exit(1);
        }
      }
+
 /* code arrays are the final values */
      opt_pcode          =calloc(MSI_phasecodes,sizeof(int32_t));
      opt_acode          =calloc(MSI_phasecodes,sizeof(int32_t));
@@ -359,6 +360,9 @@ int main(int argc, char **argv ) {
        sleep(4);
        button_command(sock,":SENS1:CORR:COLL:SAVE\r\n",10,verbose);
 
+       fprintf(stdout,"Thru Calibration completed.\n  Please visually inspect calibration now.\n");
+       mypause(); 
+
        button_command(sock,":SENS1:AVER ON\r\n",10,verbose);
        sprintf(command,":SENS1:AVER:COUN %d\r\n",VNA_triggers);
        button_command(sock,command,10,verbose);
@@ -376,11 +380,21 @@ int main(int argc, char **argv ) {
         button_command(sock,":TRIG:SING\r\n",0 ,verbose );
         button_command(sock,"*OPC?\r\n",0,verbose);
      }
-     fprintf(stdout,"\n\nVNA Init Complete\nConfigure for Phasing Card Measurements\n");
-
+     fprintf(stdout,"\n\nVNA Init Complete\n Please Connect Cables for Phasing Card Measurements\n");
      
      for(c=first_card;c<=last_card;c++) {
-          fprintf(stdout,"\nPrepare Card : %02d\n",c);
+          sprintf(filename,"%s/optcodes_cal_%s_%02d.dat",dirstub,radar_name,c);
+          err = stat(filename, &s);
+          if(-1 == err) {
+          } else {
+            fprintf(stdout,"Error:: Optimized programming file for this card already exists:\n   %s\n",filename);
+            perror("stat");
+            exit(1);
+          }
+          button_command(sock,":INIT1:CONT ON\r\n",10,verbose);
+          button_command(sock,":TRIG:SOUR BUS\r\n",10,verbose);
+          fprintf(stdout,"\nPrepare Connections for Card: %02d\n",c);
+          mypause();
           loops_done=0;
           wait_ms=10;
           fprintf(stderr,"Info:: Adjusting wait time to let dio card settle: %d ms\n",wait_ms);
@@ -1005,9 +1019,9 @@ int main(int argc, char **argv ) {
             fwrite(opt_gain_target,  sizeof(double), MSI_phasecodes,optbeamcodefile);
             fwrite(opt_gain_min,     sizeof(double), MSI_phasecodes,optbeamcodefile);
             fwrite(opt_gain_max,     sizeof(double), MSI_phasecodes,optbeamcodefile);
-
             fclose(optbeamcodefile);
             optbeamcodefile=NULL;
+            chmod(filename, S_IRUSR|S_IRGRP|S_IROTH);
           } else {
                fprintf(stdout,"    Warning::  Failed to Open: %s\n",filename);
                //mypause();
