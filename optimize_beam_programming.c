@@ -66,6 +66,7 @@ int main(int argc, char **argv ) {
      int first_card=0,last_card=19;
 
      double *phase[VNA_FREQS],*pwr_mag[VNA_FREQS], *tdelay[VNA_FREQS];
+     double *ophase[VNA_FREQS],*opwr_mag[VNA_FREQS], *otdelay[VNA_FREQS];
      double freq[VNA_FREQS];
  
      double middle=(float)(MSI_num_angles-1)/2.0;
@@ -259,6 +260,9 @@ int main(int argc, char **argv ) {
        phase[i]=calloc(MSI_phasecodes,sizeof(double));
        tdelay[i]=calloc(MSI_phasecodes,sizeof(double));
        pwr_mag[i]=calloc(MSI_phasecodes,sizeof(double));
+       ophase[i]=calloc(MSI_phasecodes,sizeof(double));
+       otdelay[i]=calloc(MSI_phasecodes,sizeof(double));
+       opwr_mag[i]=calloc(MSI_phasecodes,sizeof(double));
      }
 
 
@@ -376,6 +380,7 @@ int main(int argc, char **argv ) {
      for(c=first_card;c<=last_card;c++) {
           fprintf(stdout,"\nPrepare Card : %02d\n",c);
           loops_done=0;
+          wait_ms=10;
           //mypause();
           /* Inside the card loop */
           if (verbose > 0 ) fprintf(stdout, "  Starting optimization for Card: %d\n",c);
@@ -511,8 +516,21 @@ int main(int argc, char **argv ) {
                     } 
 
                     /* Take a measurement at best phasecode and acode */
-                    rval=take_data(sock,b,rnum,c,best_phasecode,best_attencode,pwr_mag,phase,tdelay,wait_ms,wait_ms,sshflag,verbose);
-                    if(rval!=0) exit(rval);
+                    while(wflag>0) { 
+                      rval=take_data(sock,b,rnum,c,best_phasecode,best_attencode,opwr_mag,ophase,otdelay,wait_ms,wait_ms,sshflag,verbose);
+                      if(rval!=0) exit(rval);
+                      rval=take_data(sock,b,rnum,c,best_phasecode,best_attencode,pwr_mag,phase,tdelay,wait_ms,wait_ms,sshflag,verbose);
+                      if(rval!=0) exit(rval);
+                      wflag=0;
+                      for(i=0;i<VNA_FREQS;i++) {
+                        if (fabs(otdelay[i][b]-tdelay[i][b])> 1E-9 || fabs(opwr_mag[i][b]-pwr_mag[i][b])> 0.1) {
+                          wflag=1;
+                          fprintf(stderr," Adjusting wait time to let dio card settle: %d ms\n",wait_ms);
+                          wait_ms+=30;
+                        }  
+                      }
+                    }
+                    if (wait_ms> 1000) wait_ms=1000;
                     td_sum=0.0;
                     pwr_sum=0.0;
                     nave=0; 
@@ -676,6 +694,7 @@ int main(int argc, char **argv ) {
                           pc=pc+pcode_step;
                           if (pc < 0 ) pc=0;
                           if (pc >= MSI_phasecodes  ) pc=MSI_phasecodes-1;
+                          rval=take_data(sock,b,rnum,c,pc,best_attencode,pwr_mag,phase,tdelay,wait_ms,sshflag,verbose);
                           rval=take_data(sock,b,rnum,c,pc,best_attencode,pwr_mag,phase,tdelay,wait_ms,sshflag,verbose);
                           if(rval!=0) exit(rval);
                           td_sum=0.0;
