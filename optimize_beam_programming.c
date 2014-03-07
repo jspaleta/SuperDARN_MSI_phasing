@@ -381,6 +381,8 @@ int main(int argc, char **argv ) {
           fprintf(stdout,"\nPrepare Card : %02d\n",c);
           loops_done=0;
           wait_ms=10;
+          fprintf(stderr,"Info:: Adjusting wait time to let dio card settle: %d ms\n",wait_ms);
+          fflush(stderr);
           //mypause();
           /* Inside the card loop */
           if (verbose > 0 ) fprintf(stdout, "  Starting optimization for Card: %d\n",c);
@@ -518,14 +520,21 @@ int main(int argc, char **argv ) {
                     /* Take a measurement at best phasecode and acode */
                     while(wflag>0) { 
                       rval=take_data(sock,b,rnum,c,best_phasecode,best_attencode,opwr_mag,ophase,otdelay,wait_ms,wait_ms,sshflag,verbose);
-                      if(rval!=0) exit(rval);
+                      if(rval!=0) {
+                        fprintf(stderr,"Error: Take data failed!\n");
+                        exit(rval);
+                      }
                       rval=take_data(sock,b,rnum,c,best_phasecode,best_attencode,pwr_mag,phase,tdelay,wait_ms,wait_ms,sshflag,verbose);
-                      if(rval!=0) exit(rval);
+                      if(rval!=0) { 
+                        fprintf(stderr,"Error: Take data failed!\n");
+                        exit(rval);
+                      }
                       wflag=0;
                       for(i=0;i<VNA_FREQS;i++) {
                         if (fabs(otdelay[i][b]-tdelay[i][b])> 1E-9 || fabs(opwr_mag[i][b]-pwr_mag[i][b])> 0.1) {
                           wflag=1;
-                          fprintf(stderr," Adjusting wait time to let dio card settle: %d ms\n",wait_ms);
+                          fprintf(stderr,"Info:: Adjusting wait time to let dio card settle: %d ms\n",wait_ms);
+                          fflush(stderr);
                           wait_ms+=30;
                         }  
                       }
@@ -575,7 +584,10 @@ int main(int argc, char **argv ) {
                           if (ac < 0 ) ac=0;
                           if (ac > 63 ) ac=63;
                           rval=take_data(sock,b,rnum,c,best_phasecode,ac,pwr_mag,phase,tdelay,wait_ms,sshflag,verbose);
-                          if(rval!=0) exit(rval);
+                          if(rval!=0) {
+                            fprintf(stderr,"Error: Take data failed!\n");
+                            exit(rval);
+                          }
                           pwr_sum=0.0;
                           nave=0; 
                           for(i=0;i<VNA_FREQS;i++) {
@@ -623,7 +635,10 @@ int main(int argc, char **argv ) {
                         if(acode_max > 63) acode_max=63; 
                         for(ac=acode_min;ac<=acode_max;ac++) {
                           rval=take_data(sock,b,rnum,c,best_phasecode,ac,pwr_mag,phase,tdelay,wait_ms,sshflag,verbose);
-                          if(rval!=0) exit(rval);
+                          if(rval!=0) { 
+                            fprintf(stderr,"Error: Take data failed!\n");
+                            exit(rval);
+                          }
                           pwr_sum=0.0;
                           nave=0; 
                           for(i=0;i<VNA_FREQS;i++) {
@@ -649,7 +664,10 @@ int main(int argc, char **argv ) {
                       }
 
                       rval=take_data(sock,b,rnum,c,best_phasecode,best_attencode,pwr_mag,phase,tdelay,wait_ms,sshflag,verbose);
-                      if(rval!=0) exit(rval);
+                      if(rval!=0) { 
+                            fprintf(stderr,"Error: Take data failed!\n");
+                            exit(rval);
+                      }
                       td_sum=0.0;
                       pwr_sum=0.0;
                       nave=0; 
@@ -696,7 +714,10 @@ int main(int argc, char **argv ) {
                           if (pc >= MSI_phasecodes  ) pc=MSI_phasecodes-1;
                           rval=take_data(sock,b,rnum,c,pc,best_attencode,pwr_mag,phase,tdelay,wait_ms,sshflag,verbose);
                           rval=take_data(sock,b,rnum,c,pc,best_attencode,pwr_mag,phase,tdelay,wait_ms,sshflag,verbose);
-                          if(rval!=0) exit(rval);
+                          if(rval!=0) { 
+                            fprintf(stderr,"Error: Take data failed!\n");
+                            exit(rval);
+                          }
                           td_sum=0.0;
                           pwr_sum=0.0;
                           nave=0; 
@@ -770,7 +791,10 @@ int main(int argc, char **argv ) {
 
                       for(pc=pcode_min;pc<=pcode_max;pc++) {
                         rval=take_data(sock,b,rnum,c,pc,best_attencode,pwr_mag,phase,tdelay,wait_ms,sshflag,verbose);
-                        if(rval!=0) exit(rval);
+                        if(rval!=0) { 
+                            fprintf(stderr,"Error: Take data failed!\n");
+                            exit(rval);
+                        }
                         td_sum=0.0;
                         nave=0; 
                         for(i=0;i<VNA_FREQS;i++) {
@@ -791,9 +815,11 @@ int main(int argc, char **argv ) {
                         } 
                       } 
                     }
-
-                    rval=take_data(sock,b,rnum,c,best_phasecode,best_attencode,pwr_mag,phase,wait_ms,tdelay,sshflag,verbose);
-                    if(rval!=0) exit(rval);
+                    rval=take_data(sock,b,rnum,c,best_phasecode,best_attencode,pwr_mag,phase,tdelay,wait_ms,sshflag,verbose);
+                    if(rval!=0) { 
+                            fprintf(stderr,"Error: Take data failed!\n");
+                            exit(rval);
+                    }
                     td_sum=0.0;
                     td_min=1E13;
                     td_max=-1E13;
