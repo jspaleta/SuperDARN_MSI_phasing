@@ -137,11 +137,11 @@ int button_command(int sock, char *command,int wait_ms,int verbose) {
   return 0;
 }
 
-int take_data(int sock,int b,int rnum,int c, int p,int a, double *pwr_mag[VNA_FREQS],double *phase[VNA_FREQS],double *tdelay[VNA_FREQS],int ssh_flag,int verbose){
+int take_data(int sock,int b,int rnum,int c, int p,int a, double *pwr_mag[VNA_FREQS],double *phase[VNA_FREQS],double *tdelay[VNA_FREQS],int wait_ms,int ssh_flag,int verbose){
   int t,rval;
   rval=MSI_dio_write_memory(b,rnum,c,p,a,ssh_flag,verbose);
   if(rval!=0) return rval;
-
+  usleep(1000*wait_ms);
   button_command(sock,":SENS1:AVER:CLE\r\n",30,verbose);
   for(t=0;t<VNA_triggers;t++) {
                       button_command(sock,":TRIG:SING\r\n",0,verbose);
