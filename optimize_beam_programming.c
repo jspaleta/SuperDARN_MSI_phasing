@@ -995,8 +995,10 @@ int main(int argc, char **argv ) {
                                opt_bmnum[b],   opt_bmangle_deg[b],
                                opt_freq_lo[b], opt_freq_hi[b]
                      );
-                      fprintf(stdout,"             pcode: %5d :: tdelay [ns]:: Min: %-08.5e Max: %-08.5e Ave: %-08.5e\n",opt_pcode[b],opt_tdelay_min[b],opt_tdelay_max[b],opt_tdelay_ave[b]);
-                      fprintf(stdout,"             acode: %5d :: gain   [dB]:: Min: %-08.5e Max: %-08.5e Ave: %-08.5e\n",opt_acode[b],opt_gain_min[b],opt_gain_max[b],opt_gain_ave[b]);
+                      fprintf(stdout,"             pcode: %5d :: tdelay [ns]:: Min: %-08.5e Max: %-08.5e Ave: %-08.5e Target: %-08.5e Delta: %-08.5e\n",
+                        opt_pcode[b],opt_tdelay_min[b],opt_tdelay_max[b],opt_tdelay_ave[b],opt_tdelay_target[b],fabs(opt_tdelay_ave[b]-opt_tdelay_target[b]));
+                      fprintf(stdout,"             acode: %5d :: gain   [dB]:: Min: %-08.5e Max: %-08.5e Ave: %-08.5e Target: %-08.5e Delta %-08.5e\n",
+                        opt_acode[b],opt_gain_min[b],opt_gain_max[b],opt_gain_ave[b],opt_gain_target[b],fabs(opt_gain_ave[b]-opt_gain_target[b]));
               }
               rval=MSI_dio_write_memory(b,rnum,c,opt_pcode[b],opt_acode[b],sshflag,verbose);
             }
