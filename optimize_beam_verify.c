@@ -331,6 +331,7 @@ int main(int argc, char **argv ) {
             if(wflag==1) fprintf(stdout,"Ready to begin writing saved programmming to card memory\n");
             else fprintf(stdout,"Ready to readback saved programmming from file\n");
             mypause();
+            if(keepRunning==0) return 0; 
 
  
             /* reset array lengths */
