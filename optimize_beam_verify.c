@@ -93,6 +93,7 @@ int main(int argc, char **argv ) {
      int32_t nave,pcode_range,pcode_min,pcode_max;
      int32_t acode_range,acode_min,acode_max;
 
+     int32_t    memloc;
  
      FILE *beamcodefile=NULL;
      FILE *optbeamcodefile=NULL;
@@ -100,7 +101,7 @@ int main(int argc, char **argv ) {
      char dirstub[256]="";
      char filename[512]="";
      char radar_name[16]="";
-     int32_t sshflag=0,vflag=0,wflag=0,nflag=0,cflag=0,rflag=0,rnum=0,port=23;
+     int32_t sshflag=0,vflag=0,wflag=0,mflag=0,nflag=0,cflag=0,rflag=0,rnum=0,port=23;
 
      double beam_highest_time0_nsec,beam_lowest_pwr_dB,beam_middle;
      int32_t    num_beam_freqs,num_beam_angles,num_beam_steps;
@@ -145,7 +146,7 @@ int main(int argc, char **argv ) {
 
      signal(SIGINT, intHandler);
 
-     while ((rval = getopt (argc, argv, "+r:n:c:a:p:v:s:iWVh")) != -1) {
+     while ((rval = getopt (argc, argv, "+r:m:n:c:a:p:v:s:iWVh")) != -1) {
          switch (rval) {
            case 'v':
              verbose=atoi(optarg);
@@ -153,6 +154,10 @@ int main(int argc, char **argv ) {
            case 'W':
              wflag=1; 
              vflag=1; 
+             break;
+           case 'm':
+             mflag=1; 
+             memloc=atoi(optarg);
              break;
            case 'V':
              vflag=1; 
@@ -175,7 +180,7 @@ int main(int argc, char **argv ) {
              snprintf(ssh_userhost,128,"%s",optarg);
              break;
            case '?':
-             if (optopt == 'r' || optopt =='c' || optopt =='n' || optopt=='s'|| optopt=='v')
+             if (optopt =='m' || optopt == 'r' || optopt =='c' || optopt =='n' || optopt=='s'|| optopt=='v')
                fprintf (stderr, "Option -%c requires an argument.\n", optopt);
              else if (isprint (optopt))
                fprintf (stderr, "Unknown option `-%c'.\n", optopt);
@@ -186,8 +191,9 @@ int main(int argc, char **argv ) {
              return 1;
            case 'h':
            default:
-               fprintf(stderr,"Required:\n  -r radarname\n  -n dio radar number (1 or 2)\n  -c card number\nOptional:\n  -W to write to card memory\n  -V to verify card memory\n");
-               fprintf(stderr,"  -v number to set verbose output level\n  -s user@host to enable ssh based write/verify\n");
+               fprintf(stderr,"Required:\n  -r <radarname> : 3-letter radarcode \n  -n <number> :dio radar number (1 or 2)\n  -c <number> :card number (0-19)\n");
+               fprintf(stderr,"Optional:\n  -W :flag  to enable write to card memory\n  -V :flag to enable verify card memory\n  -m  <memloc> : specify single memory location\n");
+               fprintf(stderr,"  -v <number> :to set verbose output level\n  -s <user@host> :to enable ssh based write/verify\n");
                return 1;
          }
      }
@@ -398,6 +404,9 @@ int main(int argc, char **argv ) {
           if(keepRunning==0) return 0; 
           for(b=0;b<MSI_phasecodes;b++) {
             if(keepRunning==0) return 0; 
+            if(mflag==1) {
+              if (b!=memloc) continue;
+            }
             if(opt_qual[b]>-1) {
               if (verbose > -1 ) {
                       fprintf(stdout,"           Card: %5d MemLoc: %5d Q: %5d Bmnum: %5d Angle: %13.4lf [deg] Freq Range: %-08.5e - %-08.5e [Hz]\n", c, b, opt_qual[b],
@@ -421,6 +430,9 @@ int main(int argc, char **argv ) {
             fprintf(stdout,"  Verifying card memory programming: Start\n");
             for(b=0;b<MSI_phasecodes;b++) {
               if(keepRunning==0) return 0; 
+              if(mflag==1) {
+                if (b!=memloc) continue;
+              }
               if(opt_qual[b]>-1) {
                 rval=MSI_dio_verify_memory(b,rnum,c,opt_pcode[b],opt_acode[b],sshflag,verbose);
                 if (WIFSIGNALED(rval) && (WTERMSIG(rval) == SIGINT || WTERMSIG(rval) == SIGQUIT)) return rval;
