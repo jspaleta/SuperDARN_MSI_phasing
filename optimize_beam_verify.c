@@ -152,6 +152,7 @@ int main(int argc, char **argv ) {
              break;
            case 'W':
              wflag=1; 
+             vflag=1; 
              break;
            case 'V':
              vflag=1; 
