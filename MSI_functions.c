@@ -30,6 +30,7 @@ double     MSI_target_tdelay0_nsecs=10.0;
 double     MSI_tdelay_tolerance_nsec=3.0;
 double     MSI_pwr_tolerance_dB=1.0;
 
+char       ssh_userhost[128]="";
 
 /* Hardwired stuff */
 
@@ -112,7 +113,6 @@ double MSI_timedelay_needed(double angle_degrees,double spacing_meters,int32_t c
 int MSI_dio_write_memory(int b,int rnum,int c, int p,int a,int ssh_flag,int verbose){
   char diocmd[512]="";
   char fullcmd[512]="";
-  char diossh[512]="ssh radar@azores-qnx.gi.alaska.edu";
   char diopost[512]="2>/dev/null 1>/dev/null";
   int rval;
   if( verbose > 2 ) fprintf(stdout,"Take Data: c:%d b:%d p:%d a:%d\n",c,b,p,a);
@@ -123,23 +123,24 @@ int MSI_dio_write_memory(int b,int rnum,int c, int p,int a,int ssh_flag,int verb
   }
   sprintf(diocmd,"write_card_memory -m %d -r %d -c %d -p %d -a %d",
                             b,rnum,c,p,a);
-  if(ssh_flag!=0) sprintf(fullcmd,"%s '%s' %s",diossh,diocmd,diopost);
+  if(ssh_flag!=0) sprintf(fullcmd,"ssh %s '%s' %s",ssh_userhost,diocmd,diopost);
   else sprintf(fullcmd,"%s %s",diocmd,diopost);
   if( verbose > 1 ) fprintf(stdout,"Command: %s\n",fullcmd);
   rval=system(fullcmd);
+  
   if(rval!=0) {
                       fprintf(stderr,"Dio memory write error, exiting\n");
-                      return 1;
+                      return rval;
   }
   sprintf(diocmd,"verify_card_memory -m %d -r %d -c %d -p %d -a %d",
                             b,rnum,c,p,a);
-  if(ssh_flag!=0) sprintf(fullcmd,"%s '%s' %s",diossh,diocmd,diopost);
+  if(ssh_flag!=0) sprintf(fullcmd,"ssh %s '%s' %s",ssh_userhost,diocmd,diopost);
   else sprintf(fullcmd,"%s %s",diocmd,diopost);
   if( verbose > 1 ) fprintf(stdout,"Command: %s\n",fullcmd);
   rval=system(fullcmd);
   if(rval!=0) {
                       fprintf(stderr,"Dio memory verify error, exiting\n");
-                      return 1;
+                      return rval;
   }
   fflush(stdout);
   return 0;

@@ -19,6 +19,7 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
+#include <signal.h>
 
 /* helper functions  for vna */
 #include "vna_functions.h"
@@ -47,6 +48,7 @@ extern int32_t    VNA_triggers;
 extern int32_t    VNA_wait_delay_ms;
 extern int32_t    VNA_min_nave;
 
+extern char*      ssh_userhost;
 int main(int argc, char **argv ) {
      
      int verbose=0;
@@ -146,7 +148,7 @@ int main(int argc, char **argv ) {
      double     *opt_gain_max=NULL;
 
 
-     while ((rval = getopt (argc, argv, "+r:n:c:a:p:v:ish")) != -1) {
+     while ((rval = getopt (argc, argv, "+r:n:c:a:p:v:s:ih")) != -1) {
          switch (rval) {
            case 'a':
              snprintf(vna_host,24,"%s",optarg);
@@ -175,9 +177,10 @@ int main(int argc, char **argv ) {
              break;
            case 's':
              sshflag=1;
+             snprintf(ssh_userhost,128,"%s",optarg);
              break;
            case '?':
-             if (optopt == 'r' || optopt =='c' || optopt =='n' || optopt=='p' || optopt=='a' || optopt=='v')
+             if (optopt == 'r' || optopt =='c' || optopt =='n' || optopt=='p' || optopt=='s'|| optopt=='a' || optopt=='v')
                fprintf (stderr, "Option -%c requires an argument.\n", optopt);
              else if (isprint (optopt))
                fprintf (stderr, "Unknown option `-%c'.\n", optopt);
@@ -188,7 +191,7 @@ int main(int argc, char **argv ) {
              return 1;
            case 'h':
            default:
-               fprintf (stderr,"Required:\n  -r radarname\n  -n dio radar number (1 or 2)\n  -c card number\nOptional:\n  -a vna ipaddress\n  -p vna tcp port\n  -i to run vna init and cal process\n  -v number to set verbose output level\n");
+               fprintf (stderr,"Required:\n  -r radarname\n  -n dio radar number (1 or 2)\n  -c card number\nOptional:\n  -a vna ipaddress\n  -p vna tcp port\n  -i to run vna init and cal process\n  -v number to set verbose output level\n  -s user@host to enable ssh based write/verify\n");
                return 1;
          }
      }
@@ -1043,6 +1046,8 @@ int main(int argc, char **argv ) {
                         opt_acode[b],opt_gain_min[b],opt_gain_max[b],opt_gain_ave[b],opt_gain_target[b],fabs(opt_gain_ave[b]-opt_gain_target[b]));
               }
               rval=MSI_dio_write_memory(b,rnum,c,opt_pcode[b],opt_acode[b],sshflag,verbose);
+              if (WIFSIGNALED(rval) && (WTERMSIG(rval) == SIGINT || WTERMSIG(rval) == SIGQUIT)) return rval;
+
             }
           }
           if (verbose > -1 ){ 
