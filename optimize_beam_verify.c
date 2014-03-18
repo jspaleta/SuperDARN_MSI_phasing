@@ -416,7 +416,7 @@ int main(int argc, char **argv ) {
             }
           }
           if(vflag==1) {
-            fprintf(stdout,"  Verifying card memory programming...\n");
+            fprintf(stdout,"  Verifying card memory programming: Start\n");
             for(b=0;b<MSI_phasecodes;b++) {
               if(keepRunning==0) return 0; 
               if(opt_qual[b]>-1) {
@@ -430,6 +430,7 @@ int main(int argc, char **argv ) {
                 }
               }
             }
+            fprintf(stdout,"  Verifying card memory programming: End\n");
           }
           continue;
 
