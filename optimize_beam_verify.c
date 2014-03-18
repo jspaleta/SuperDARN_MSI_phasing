@@ -205,11 +205,13 @@ int main(int argc, char **argv ) {
      if (caldir==NULL) {
           caldir=strdup("/data/calibrations/");
      }
-     fprintf(stdout,"CALDIR: %s\n",caldir);
-     printf("Radar: <%s>\n",radar_name);
      sprintf(dirstub,"/%s/%s/",caldir,radar_name);
-     fprintf(stdout,"RADARDIR: %s\n",dirstub);
-     fflush(stdout);
+     if(mflag==0) {
+       fprintf(stdout,"CALDIR: %s\n",caldir);
+       printf("Radar: <%s>\n",radar_name);
+       fprintf(stdout,"RADARDIR: %s\n",dirstub);
+       fflush(stdout);
+     }
      struct stat s;
      int err = stat(dirstub, &s);
      if(-1 == err) {
@@ -305,9 +307,10 @@ int main(int argc, char **argv ) {
           sprintf(filename,"%s/optcodes_cal_%s_%02d.dat",dirstub,radar_name,c);
           optbeamcodefile=fopen(filename,"r");
           if (optbeamcodefile!=NULL) {
-            if (verbose > -1 ) fprintf(stdout,"    Reading Optimized values to file for card: %d\n",c);
-            if (verbose > -1 ) fprintf(stdout,"      Opened: %s\n",filename);
-
+            if(mflag==0) {
+              if (verbose > -1 ) fprintf(stdout,"    Reading Optimized values to file for card: %d\n",c);
+              if (verbose > -1 ) fprintf(stdout,"      Opened: %s\n",filename);
+            }
             /* Length of the arrays */
             fread(&MSI_phasecodes,  sizeof(int32_t),1,optbeamcodefile);
             /* memory offset to start of narrow freq band */
@@ -327,16 +330,17 @@ int main(int argc, char **argv ) {
             fread(&MSI_max_freq,    sizeof(double),1,optbeamcodefile);
             /* Narrow frequency window considered */
             fread(&MSI_freq_window, sizeof(double),1,optbeamcodefile);
-
-            fprintf(stdout,"Info:: Angles: %d\n",MSI_num_angles);
-            fprintf(stdout,"Info:: Freq Steps: %d\n",freq_steps);
             loops_total=freq_steps*MSI_num_angles;
-            fprintf(stdout,"Info:: Optimizations per card: %d\n",loops_total);
-            fprintf(stdout,"Info:: Max Card Memory Location: %d\n",opt_mem_offset+(freq_steps*opt_mem_offset+MSI_num_angles));
-            if(sshflag==1) fprintf(stdout,"Info:: SSH: %s\n",ssh_userhost);
-            if(wflag==1) fprintf(stdout,"Ready to begin writing saved programmming to card memory\n");
-            else fprintf(stdout,"Ready to readback saved programmming from file\n");
-            mypause();
+            if(mflag==0) {
+              fprintf(stdout,"Info:: Angles: %d\n",MSI_num_angles);
+              fprintf(stdout,"Info:: Freq Steps: %d\n",freq_steps);
+              fprintf(stdout,"Info:: Optimizations per card: %d\n",loops_total);
+              fprintf(stdout,"Info:: Max Card Memory Location: %d\n",opt_mem_offset+(freq_steps*opt_mem_offset+MSI_num_angles));
+              if(sshflag==1) fprintf(stdout,"Info:: SSH: %s\n",ssh_userhost);
+              if(wflag==1) fprintf(stdout,"Ready to begin writing saved programmming to card memory\n");
+              else fprintf(stdout,"Ready to readback saved programmming from file\n");
+              mypause();
+            }
             if(keepRunning==0) return 0; 
 
  
