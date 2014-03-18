@@ -110,6 +110,7 @@ double MSI_timedelay_needed(double angle_degrees,double spacing_meters,int32_t c
   }
   return needed;
 }
+
 int MSI_dio_write_memory(int b,int rnum,int c, int p,int a,int ssh_flag,int verbose){
   char diocmd[512]="";
   char fullcmd[512]="";
@@ -146,3 +147,27 @@ int MSI_dio_write_memory(int b,int rnum,int c, int p,int a,int ssh_flag,int verb
   return 0;
 }
 
+int MSI_dio_verify_memory(int memloc,int rnum,int c, int p,int a,int ssh_flag,int verbose){
+  char diocmd[512]="";
+  char fullcmd[512]="";
+  char diopost[512]="2>/dev/null 1>/dev/null";
+  int rval;
+  if( verbose > 2 ) fprintf(stdout,"Input : c:%d memloc:%d p:%d a:%d\n",c,memloc,p,a);
+
+  if (memloc>=MSI_phasecodes) {
+                     fprintf(stderr,"Bad memory address: %d\n",memloc);
+                      return 1;
+  }
+  sprintf(diocmd,"verify_card_memory -m %d -r %d -c %d -p %d -a %d",
+                            memloc,rnum,c,p,a);
+  if(ssh_flag!=0) sprintf(fullcmd,"ssh %s '%s' %s",ssh_userhost,diocmd,diopost);
+  else sprintf(fullcmd,"%s %s",diocmd,diopost);
+  if( verbose > 1 ) fprintf(stdout,"Command: %s\n",fullcmd);
+  rval=system(fullcmd);
+  if(rval!=0) {
+                      fprintf(stderr,"Dio memory verify error, exiting\n");
+                      return rval;
+  }
+  fflush(stdout);
+  return 0;
+}

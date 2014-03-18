@@ -100,7 +100,7 @@ int main(int argc, char **argv ) {
      char dirstub[256]="";
      char filename[512]="";
      char radar_name[16]="";
-     int32_t sshflag=0,wflag=0,nflag=0,cflag=0,rflag=0,rnum=0,port=23;
+     int32_t sshflag=0,vflag=0,wflag=0,nflag=0,cflag=0,rflag=0,rnum=0,port=23;
 
      double beam_highest_time0_nsec,beam_lowest_pwr_dB,beam_middle;
      int32_t    num_beam_freqs,num_beam_angles,num_beam_steps;
@@ -145,13 +145,16 @@ int main(int argc, char **argv ) {
 
      signal(SIGINT, intHandler);
 
-     while ((rval = getopt (argc, argv, "+r:n:c:a:p:v:s:iwh")) != -1) {
+     while ((rval = getopt (argc, argv, "+r:n:c:a:p:v:s:iWVh")) != -1) {
          switch (rval) {
            case 'v':
              verbose=atoi(optarg);
              break;
-           case 'w':
+           case 'W':
              wflag=1; 
+             break;
+           case 'V':
+             vflag=1; 
              break;
            case 'n':
              rnum=atoi(optarg);
@@ -182,7 +185,8 @@ int main(int argc, char **argv ) {
              return 1;
            case 'h':
            default:
-               fprintf (stderr,"Required:\n  -r radarname\n  -n dio radar number (1 or 2)\n  -c card number\nOptional:\n  -w to write to card memory\n  -v number to set verbose output level\n  -s user@host to enable ssh based write/verify\n");
+               fprintf(stderr,"Required:\n  -r radarname\n  -n dio radar number (1 or 2)\n  -c card number\nOptional:\n  -W to write to card memory\n  -V to verify card memory\n");
+               fprintf(stderr,"  -v number to set verbose output level\n  -s user@host to enable ssh based write/verify\n");
                return 1;
          }
      }
@@ -406,6 +410,24 @@ int main(int argc, char **argv ) {
               if(wflag==1) {
                 rval=MSI_dio_write_memory(b,rnum,c,opt_pcode[b],opt_acode[b],sshflag,verbose);
                 if (WIFSIGNALED(rval) && (WTERMSIG(rval) == SIGINT || WTERMSIG(rval) == SIGQUIT)) return rval;
+              } else {
+
+              }
+            }
+          }
+          if(vflag==1) {
+            fprintf(stdout,"  Verifying card memory programming...\n");
+            for(b=0;b<MSI_phasecodes;b++) {
+              if(keepRunning==0) return 0; 
+              if(opt_qual[b]>-1) {
+                rval=MSI_dio_verify_memory(b,rnum,c,opt_pcode[b],opt_acode[b],sshflag,verbose);
+                if (WIFSIGNALED(rval) && (WTERMSIG(rval) == SIGINT || WTERMSIG(rval) == SIGQUIT)) return rval;
+                if (rval!=0) {
+                      fprintf(stdout,"  ERROR:  Card: %5d MemLoc: %5d Q: %5d Bmnum: %5d Angle: %13.4lf [deg] Freq Range: %-08.5e - %-08.5e [Hz]\n", c, b, opt_qual[b],
+                               opt_bmnum[b],   opt_bmangle_deg[b],
+                               opt_freq_lo[b], opt_freq_hi[b]
+                     );
+                }
               }
             }
           }
