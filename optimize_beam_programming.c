@@ -573,12 +573,12 @@ int main(int argc, char **argv ) {
 
                     /* Take a measurement at best phasecode and acode */
                     while(wflag>0) { 
-                      rval=take_data(sock,b,rnum,c,best_phasecode,best_attencode,opwr_mag,ophase,otdelay,wait_ms,sshflag,verbose,needed_timedelay,MSI_target_pwr_dB);
+                      rval=take_data(sock,b,rnum,c,best_phasecode,best_attencode,opwr_mag,ophase,otdelay,wait_ms,sshflag,verbose,needed_tdelay,MSI_target_pwr_dB);
                       if(rval!=0) {
                         fprintf(stderr,"Error: Take data failed!\n");
                         exit(rval);
                       }
-                      rval=take_data(sock,b,rnum,c,best_phasecode,best_attencode,pwr_mag,phase,tdelay,wait_ms,sshflag,verbose,needed_timedelay,MSI_target_pwr_dB);
+                      rval=take_data(sock,b,rnum,c,best_phasecode,best_attencode,pwr_mag,phase,tdelay,wait_ms,sshflag,verbose,needed_tdelay,MSI_target_pwr_dB);
                       if(rval!=0) { 
                         fprintf(stderr,"Error: Take data failed!\n");
                         exit(rval);
@@ -637,7 +637,7 @@ int main(int argc, char **argv ) {
                           ac=ac-acode_step;
                           if (ac < 0 ) ac=0;
                           if (ac > 63 ) ac=63;
-                          rval=take_data(sock,b,rnum,c,best_phasecode,ac,pwr_mag,phase,tdelay,wait_ms,sshflag,verbose,needed_timedelay,MSI_target_pwr_dB);
+                          rval=take_data(sock,b,rnum,c,best_phasecode,ac,pwr_mag,phase,tdelay,wait_ms,sshflag,verbose,needed_tdelay,MSI_target_pwr_dB);
                           if(rval!=0) {
                             fprintf(stderr,"Error: Take data failed!\n");
                             exit(rval);
@@ -688,7 +688,7 @@ int main(int argc, char **argv ) {
 		        if(acode_min < 0) acode_min=0; 
                         if(acode_max > 63) acode_max=63; 
                         for(ac=acode_min;ac<=acode_max;ac++) {
-                          rval=take_data(sock,b,rnum,c,best_phasecode,ac,pwr_mag,phase,tdelay,wait_ms,sshflag,verbose,needed_timedelay,MSI_target_pwr_dB);
+                          rval=take_data(sock,b,rnum,c,best_phasecode,ac,pwr_mag,phase,tdelay,wait_ms,sshflag,verbose,needed_tdelay,MSI_target_pwr_dB);
                           if(rval!=0) { 
                             fprintf(stderr,"Error: Take data failed!\n");
                             exit(rval);
@@ -717,7 +717,7 @@ int main(int argc, char **argv ) {
                         fprintf(stdout,"        Optimized acode: %d %lf %lf\n",best_attencode,best_pwr,MSI_target_pwr_dB); 
                       }
 
-                      rval=take_data(sock,b,rnum,c,best_phasecode,best_attencode,pwr_mag,phase,tdelay,wait_ms,sshflag,verbose,needed_timedelay,MSI_target_pwr_dB);
+                      rval=take_data(sock,b,rnum,c,best_phasecode,best_attencode,pwr_mag,phase,tdelay,wait_ms,sshflag,verbose,needed_tdelay,MSI_target_pwr_dB);
                       if(rval!=0) { 
                             fprintf(stderr,"Error: Take data failed!\n");
                             exit(rval);
@@ -766,7 +766,7 @@ int main(int argc, char **argv ) {
                           pc=pc+pcode_step;
                           if (pc < 0 ) pc=0;
                           if (pc >= MSI_phasecodes  ) pc=MSI_phasecodes-1;
-                          rval=take_data(sock,b,rnum,c,pc,best_attencode,pwr_mag,phase,tdelay,wait_ms,sshflag,verbose,needed_timedelay,MSI_target_pwr_dB);
+                          rval=take_data(sock,b,rnum,c,pc,best_attencode,pwr_mag,phase,tdelay,wait_ms,sshflag,verbose,needed_tdelay,MSI_target_pwr_dB);
                           if(rval!=0) { 
                             fprintf(stderr,"Error: Take data failed!\n");
                             exit(rval);
@@ -843,7 +843,7 @@ int main(int argc, char **argv ) {
                       fprintf(stdout,"        Optimizing phasecode.... %d measurements needed\n",pcode_range); 
 
                       for(pc=pcode_min;pc<=pcode_max;pc++) {
-                        rval=take_data(sock,b,rnum,c,pc,best_attencode,pwr_mag,phase,tdelay,wait_ms,sshflag,verbose,needed_timedelay,MSI_target_pwr_dB);
+                        rval=take_data(sock,b,rnum,c,pc,best_attencode,pwr_mag,phase,tdelay,wait_ms,sshflag,verbose,needed_tdelay,MSI_target_pwr_dB);
                         if(rval!=0) { 
                             fprintf(stderr,"Error: Take data failed!\n");
                             exit(rval);
@@ -868,7 +868,7 @@ int main(int argc, char **argv ) {
                         } 
                       } 
                     }
-                    rval=take_data(sock,b,rnum,c,best_phasecode,best_attencode,pwr_mag,phase,tdelay,wait_ms,sshflag,verbose,needed_timedelay,MSI_target_pwr_dB);
+                    rval=take_data(sock,b,rnum,c,best_phasecode,best_attencode,pwr_mag,phase,tdelay,wait_ms,sshflag,verbose,needed_tdelay,MSI_target_pwr_dB);
                     if(rval!=0) { 
                             fprintf(stderr,"Error: Take data failed!\n");
                             exit(rval);
