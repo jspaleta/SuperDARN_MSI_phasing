@@ -115,6 +115,7 @@ int MSI_dio_write_memory(int b,int rnum,int c, int p,int a,int ssh_flag,int verb
   char diocmd[512]="";
   char fullcmd[512]="";
   char diopost[512]="2>/dev/null 1>/dev/null";
+  //char diopost[512]="";
   int rval;
   if( verbose > 2 ) fprintf(stdout,"Take Data: c:%d b:%d p:%d a:%d\n",c,b,p,a);
 
@@ -140,7 +141,9 @@ int MSI_dio_write_memory(int b,int rnum,int c, int p,int a,int ssh_flag,int verb
   if( verbose > 1 ) fprintf(stdout,"Command: %s\n",fullcmd);
   rval=system(fullcmd);
   if(rval!=0) {
-                      fprintf(stderr,"Dio memory verify error, exiting\n");
+                      fprintf(stderr,"Dio memory verify error, exiting: %d\n",rval);
+                      fflush(stderr);
+                      fflush(stdout);
                       return rval;
   }
   fflush(stdout);

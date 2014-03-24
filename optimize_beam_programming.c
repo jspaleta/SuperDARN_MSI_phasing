@@ -86,7 +86,7 @@ int main(int argc, char **argv ) {
      double adelta,tdelta;
      double test_adelta,test_tdelta;
      double asign,tsign;
-     int32_t fast_loop,count,wflag,acode_step,pcode_step;
+     int32_t fast_loop,count,bflag,wflag,acode_step,pcode_step;
      double fdiff,tdiff;
 
      int32_t nave,pcode_range,pcode_min,pcode_max;
@@ -262,7 +262,8 @@ int main(int argc, char **argv ) {
        opt_gain_max[b]=1E13;
      }
      for(i=0;i<VNA_FREQS;i++) {
-       freq[i]=MSI_min_freq+i*((MSI_max_freq-MSI_min_freq)/(double)(VNA_FREQS-1));
+       /* freq array must match the VNA settings */
+       freq[i]=VNA_MIN+i*((VNA_MAX-VNA_MIN)/(double)(VNA_FREQS-1));
        phase[i]=calloc(MSI_phasecodes,sizeof(double));
        tdelay[i]=calloc(MSI_phasecodes,sizeof(double));
        pwr_mag[i]=calloc(MSI_phasecodes,sizeof(double));
@@ -383,8 +384,15 @@ int main(int argc, char **argv ) {
         button_command(sock,":TRIG:SING\r\n",0 ,verbose );
         button_command(sock,"*OPC?\r\n",0,verbose);
      }
-     fprintf(stdout,"\n\nVNA Init Complete\n Please Connect Cables for Phasing Card Measurements\n");
-     
+     fprintf(stdout,"\n\nVNA Init Complete\n Please Confirm the following VNA Settings:\n");
+     fprintf(stdout,"  VNA Min Freq: %10.5lf MHz\n",VNA_MIN*1E-6);
+     fprintf(stdout,"  VNA Max Freq: %10.5lf MHz\n",VNA_MAX*1E-6);
+     fprintf(stdout,"  VNA Points:   %d\n",VNA_FREQS);
+
+     fprintf(stdout,"\nIf these settings are incorrect, abort and run program with the -i to enable vna init\n");
+     fprintf(stdout,"\nIf these settings are correct, connect cables for phasing Card %d Measurements\n",first_card);
+     mypause();
+ 
      for(c=first_card;c<=last_card;c++) {
           sprintf(filename,"%s/optcodes_cal_%s_%02d.dat",dirstub,radar_name,c);
           err = stat(filename, &s);
@@ -528,6 +536,12 @@ int main(int argc, char **argv ) {
                     }
                     b=f*opt_mem_offset+a;
                     if (f>0) b+=opt_mem_offset;
+                    //bflag=0;
+                    //fprintf(stdout,"F: %d A: %d B: %d\n",f,a,b);  
+                    //if (b!=320) {
+                    //  bflag=1; 
+                    //  continue;
+                    //}
                     if (verbose > -1 ){ 
                       fprintf(stdout,"      >>>>>>>\n");  
                       fprintf(stdout,"      Optimize Start:: MemLoc: %5d Q: %5d Freq Step: %5d : %-08.5e - %-08.5e [Hz]\n", b,opt_qual[b],f,freq_lo[f],freq_hi[f]);

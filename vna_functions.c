@@ -148,12 +148,12 @@ int take_data(int sock,int b,int rnum,int c, int p,int a, double *pwr_mag[VNA_FR
                       button_command(sock,"*OPC?\r\n",0,verbose);
   }
   button_command(sock,"DISP:WIND1:TRAC3:Y:AUTO\r\n",10,verbose);
-  button_command(sock,":CALC1:PAR3:SEL\r\n",10,verbose);
-  mlog_data_command(sock,":CALC1:DATA:FDAT?\r\n",tdelay,b,verbose) ;
   button_command(sock,":CALC1:PAR1:SEL\r\n",10,verbose);
   mlog_data_command(sock,":CALC1:DATA:FDAT?\r\n",phase,b,verbose) ;
   button_command(sock,":CALC1:PAR2:SEL\r\n",10,verbose);
   mlog_data_command(sock,":CALC1:DATA:FDAT?\r\n",pwr_mag,b,verbose) ;
+  button_command(sock,":CALC1:PAR3:SEL\r\n",10,verbose);
+  mlog_data_command(sock,":CALC1:DATA:FDAT?\r\n",tdelay,b,verbose) ;
   return 0;
 }
 
