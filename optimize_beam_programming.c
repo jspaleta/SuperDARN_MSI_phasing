@@ -10,6 +10,7 @@
  *
  */
 
+#include <ctype.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <stdio.h>
@@ -56,11 +57,11 @@ int main(int argc, char **argv ) {
      int rval;
      int i,c,b,a,f,t,bf,ba,pc,ac;
      struct timespec begin_card, end_card;
-     double  time_spent_card;
+     double  time_spent_card=0.0;
      struct timespec begin_angle, end_angle;
-     double  time_spent_angle;
+     double  time_spent_angle=0.0;
      struct timespec begin_step, end_step;
-     double  time_spent_step;
+     double  time_spent_step=0.0;
      int32_t loops_total, loops_done;
 
      int32_t best_beam_freq_index,best_beam_angle_index,best_phasecode,best_attencode; 
@@ -86,7 +87,7 @@ int main(int argc, char **argv ) {
      double adelta,tdelta;
      double test_adelta,test_tdelta;
      double asign,tsign;
-     int32_t fast_loop,count,bflag,wflag,acode_step,pcode_step;
+     int32_t fast_loop,count,wflag,acode_step,pcode_step;
      double fdiff,tdiff;
 
      int32_t nave,pcode_range,pcode_min,pcode_max;
@@ -103,7 +104,6 @@ int main(int argc, char **argv ) {
      char strout[128]="";
      char output[128]="";
      char command[128]="";
-     char diocmd[256]="";
      int32_t sshflag=0,iflag=0,nflag=0,cflag=0,rflag=0,rnum=0,port=23;
 
      double beam_highest_time0_nsec,beam_lowest_pwr_dB,beam_middle;
@@ -553,15 +553,9 @@ int main(int argc, char **argv ) {
                     }
                     b=f*opt_mem_offset+a;
                     if (f>0) b+=opt_mem_offset;
-                    //bflag=0;
-                    //fprintf(stdout,"F: %d A: %d B: %d\n",f,a,b);  
-                    //if (b!=320) {
-                    //  bflag=1; 
-                    //  continue;
-                    //}
                     if (verbose > -1 ){ 
                       fprintf(stdout,"      >>>>>>>\n");  
-                      fprintf(stdout,"      Optimize Start:: MemLoc: %5d Q: %5d Freq Step: %5d : %-08.5e - %-08.5e [Hz]\n", b,opt_qual[b],f,freq_lo[f],freq_hi[f]);
+                      fprintf(stdout,"      Optimize Start:: MemLoc: %5d Q: %5d Freq Step: %5d : %-8.5e - %-8.5e [Hz]\n", b,opt_qual[b],f,freq_lo[f],freq_hi[f]);
                       fprintf(stdout,"        Initial phasecode: %5d  acode: %5d\n",best_phasecode,best_attencode);
                       fprintf(stdout,"        Initial tdelay: %lf [ns] atten: %lf [dB]\n",best_tdelay,best_pwr);
                       fflush(stdout);
@@ -751,7 +745,7 @@ int main(int argc, char **argv ) {
 
                       /* First lets do an attempt at quick optimization */ 
                       if(tdelta <= MSI_tdelay_tolerance_nsec) {  
-                        fprintf(stdout,"        Optimizing phasecode skipped\n",pcode_range); 
+                        fprintf(stdout,"        Optimizing phasecode skipped\n"); 
                       } else {
                         fprintf(stdout,"        Try fast phasecode optimization....\n"); 
                         test_tdelta=tdelta;
@@ -814,7 +808,7 @@ int main(int argc, char **argv ) {
                         adelta=test_adelta;
                       }  
                       fprintf(stdout,"          Fast Optimized pcode: %5d :: tdelay [ns]:: Measured: %13.4lf Needed: %13.4lf tdelta: %13.4lf\n",best_phasecode,best_tdelay,needed_tdelay,tdelta); 
-                      fprintf(stdout,"          Fast Optimized acode: %5d :: Gain   [dB]:: Measured: %13.4lf Needed: %13.4lf adelta: %13.4lf\n",best_attencode,best_pwr,MSI_target_pwr_dB,adelta,test_adelta); 
+                      fprintf(stdout,"          Fast Optimized acode: %5d :: Gain   [dB]:: Measured: %13.4lf Needed: %13.4lf adelta: %13.4lf\n",best_attencode,best_pwr,MSI_target_pwr_dB,adelta); 
                       if(adelta > MSI_pwr_tolerance_dB) {
                         fprintf(stdout,"          Redo Fast Optimization: %d\n",fast_loop); 
                         fast_loop++;
@@ -825,7 +819,7 @@ int main(int argc, char **argv ) {
                     }
                     if(adelta > MSI_pwr_tolerance_dB) {
                       fprintf(stderr,"Warning:: Fast optimization of gain failed to reach tolerance\n");
-                      fprintf(stderr,"  acode: %5d :: Gain   [dB]:: Measured: %13.4lf Needed: %13.4lf adelta: %13.4lf\n",best_attencode,best_pwr,MSI_target_pwr_dB,adelta,test_adelta); 
+                      fprintf(stderr,"  acode: %5d :: Gain   [dB]:: Measured: %13.4lf Needed: %13.4lf adelta: %13.4lf\n",best_attencode,best_pwr,MSI_target_pwr_dB,adelta); 
                     }
                     /* Okay Brute Force optimization now */
                     if(tdelta > MSI_tdelay_tolerance_nsec) {  
@@ -916,7 +910,7 @@ int main(int argc, char **argv ) {
 
                     if(opt_qual[b]!=-1) {
                       fprintf(stdout,"Warning::: We are overwriting a memory location already used\n");
-                      fprintf(stdout,"           MemLoc: %5d Q: %5d Angle: %5d Freq Step: %5d : %-08.5e - %-08.5e [Hz]\n", b, opt_qual[b],a, f,opt_freq_lo[b],opt_freq_hi[b]);
+                      fprintf(stdout,"           MemLoc: %5d Q: %5d Angle: %5d Freq Step: %5d : %-8.5e - %-8.5e [Hz]\n", b, opt_qual[b],a, f,opt_freq_lo[b],opt_freq_hi[b]);
                       fprintf(stdout,"           tdelay [ns]:: Min: %13.4lf Max: %13.4lf Ave: %13.4lf\n",opt_tdelay_min[b],opt_tdelay_max[b],opt_tdelay_ave[b]);
                       fprintf(stdout,"           gain   [dB]:: Min: %13.4lf Max: %13.4lf Ave: %13.4lf\n",opt_gain_min[b],opt_gain_max[b],opt_gain_ave[b]);
                       //mypause();
@@ -941,7 +935,7 @@ int main(int argc, char **argv ) {
 
 
                     fprintf(stdout,"      -------\n");  
-                    fprintf(stdout,"      Optimize End:: MemLoc: %5d Q: %5d Angle: %5d Freq Step: %5d : %-08.5e - %-08.5e [Hz]\n", b,opt_qual[b],a, f,opt_freq_lo[b],opt_freq_hi[b]);
+                    fprintf(stdout,"      Optimize End:: MemLoc: %5d Q: %5d Angle: %5d Freq Step: %5d : %-8.5e - %-8.5e [Hz]\n", b,opt_qual[b],a, f,opt_freq_lo[b],opt_freq_hi[b]);
                     fprintf(stdout,"          pcode: %d  acode %d\n",opt_pcode[b],opt_acode[b]); 
                     fprintf(stdout,"          Needed tdelay: %13.4lf (ns) Opt tdelay: %13.4lf (ns) Delta: %13.4lf (ns)\n",opt_tdelay_target[b],opt_tdelay_ave[b],tdelta); 
                     fprintf(stdout,"            tdelay [ns]:: Min: %13.4lf Max: %13.4lf P2P: %13.4lf\n",opt_tdelay_min[b],opt_tdelay_max[b],td_pp*1E9); 
@@ -958,7 +952,7 @@ int main(int argc, char **argv ) {
                     } 
                }
                clock_gettime(CLOCK_MONOTONIC,&end_angle);
-               time_spent_step=(end_angle.tv_sec-begin_angle.tv_sec)+1E-9*(end_angle.tv_nsec-begin_angle.tv_nsec);
+               time_spent_angle=(end_angle.tv_sec-begin_angle.tv_sec)+1E-9*(end_angle.tv_nsec-begin_angle.tv_nsec);
                time_spent_card=(end_angle.tv_sec-begin_card.tv_sec)+1E-9*(end_angle.tv_nsec-begin_card.tv_nsec);
                fprintf(stdout,"    -------\n");  
                fprintf(stdout, "    Angle Elapsed  :: %13.3lf\n", time_spent_angle);
@@ -976,7 +970,7 @@ int main(int argc, char **argv ) {
            
             if(opt_qual[b]!=-1) {
                       fprintf(stderr,"Warning::: We are overwriting a memory location already used\n");
-                      fprintf(stderr,"           Card: %5d MemLoc: %5d Q: %5d Angle: %5d Freq Step: %5d : %-08.5e - %-08.5e [Hz]\n", c, b, opt_qual[b],a, f,opt_freq_lo[b],opt_freq_hi[b]);
+                      fprintf(stderr,"           Card: %5d MemLoc: %5d Q: %5d Angle: %5d Freq Step: %5d : %-8.5e - %-8.5e [Hz]\n", c, b, opt_qual[b],a, f,opt_freq_lo[b],opt_freq_hi[b]);
                       fprintf(stderr,"           tdelay [ns]:: Min: %13.4lf Max: %13.4lf Ave: %13.4lf\n",opt_tdelay_min[b],opt_tdelay_max[b],opt_tdelay_ave[b]);
                       fprintf(stderr,"           gain   [dB]:: Min: %13.4lf Max: %13.4lf Ave: %13.4lf\n",opt_gain_min[b],opt_gain_max[b],opt_gain_ave[b]);
             }
@@ -986,7 +980,7 @@ int main(int argc, char **argv ) {
             b=8190;
             if(opt_qual[b]!=-1) {
                       fprintf(stderr,"Warning::: We are overwriting a memory location already used\n");
-                      fprintf(stderr,"           Card: %5d MemLoc: %5d Q: %5d Angle: %5d Freq Step: %5d : %-08.5e - %-08.5e [Hz]\n", c, b, opt_qual[b],a, f,opt_freq_lo[b],opt_freq_hi[b]);
+                      fprintf(stderr,"           Card: %5d MemLoc: %5d Q: %5d Angle: %5d Freq Step: %5d : %-8.5e - %-8.5e [Hz]\n", c, b, opt_qual[b],a, f,opt_freq_lo[b],opt_freq_hi[b]);
                       fprintf(stderr,"           tdelay [ns]:: Min: %13.4lf Max: %13.4lf Ave: %13.4lf\n",opt_tdelay_min[b],opt_tdelay_max[b],opt_tdelay_ave[b]);
                       fprintf(stderr,"           gain   [dB]:: Min: %13.4lf Max: %13.4lf Ave: %13.4lf\n",opt_gain_min[b],opt_gain_max[b],opt_gain_ave[b]);
             }
@@ -996,7 +990,7 @@ int main(int argc, char **argv ) {
             b=8189;
             if(opt_qual[b]!=-1) {
                       fprintf(stderr,"Warning::: We are overwriting a memory location already used\n");
-                      fprintf(stderr,"           Card: %5d MemLoc: %5d Q: %5d Angle: %5d Freq Step: %5d : %-08.5e - %-08.5e [Hz]\n", c, b, opt_qual[b],a, f,opt_freq_lo[b],opt_freq_hi[b]);
+                      fprintf(stderr,"           Card: %5d MemLoc: %5d Q: %5d Angle: %5d Freq Step: %5d : %-8.5e - %-8.5e [Hz]\n", c, b, opt_qual[b],a, f,opt_freq_lo[b],opt_freq_hi[b]);
                       fprintf(stderr,"           tdelay [ns]:: Min: %13.4lf Max: %13.4lf Ave: %13.4lf\n",opt_tdelay_min[b],opt_tdelay_max[b],opt_tdelay_ave[b]);
                       fprintf(stderr,"           gain   [dB]:: Min: %13.4lf Max: %13.4lf Ave: %13.4lf\n",opt_gain_min[b],opt_gain_max[b],opt_gain_ave[b]);
             }
@@ -1006,7 +1000,7 @@ int main(int argc, char **argv ) {
             b=8188;
             if(opt_qual[b]!=-1) {
                       fprintf(stderr,"Warning::: We are overwriting a memory location already used\n");
-                      fprintf(stderr,"           Card: %5d MemLoc: %5d Q: %5d Angle: %5d Freq Step: %5d : %-08.5e - %-08.5e [Hz]\n", c, b, opt_qual[b],a, f,opt_freq_lo[b],opt_freq_hi[b]);
+                      fprintf(stderr,"           Card: %5d MemLoc: %5d Q: %5d Angle: %5d Freq Step: %5d : %-8.5e - %-8.5e [Hz]\n", c, b, opt_qual[b],a, f,opt_freq_lo[b],opt_freq_hi[b]);
                       fprintf(stderr,"           tdelay [ns]:: Min: %13.4lf Max: %13.4lf Ave: %13.4lf\n",opt_tdelay_min[b],opt_tdelay_max[b],opt_tdelay_ave[b]);
                       fprintf(stderr,"           gain   [dB]:: Min: %13.4lf Max: %13.4lf Ave: %13.4lf\n",opt_gain_min[b],opt_gain_max[b],opt_gain_ave[b]);
             }
@@ -1070,13 +1064,13 @@ int main(int argc, char **argv ) {
           for(b=0;b<MSI_phasecodes;b++) {
             if(opt_qual[b]>=0) {
               if (verbose > -1 ) {
-                      fprintf(stdout,"           Card: %5d MemLoc: %5d Q: %5d Bmnum: %5d Angle: %13.4lf [deg] Freq Range: %-08.5e - %-08.5e [Hz]\n", c, b, opt_qual[b],
+                      fprintf(stdout,"           Card: %5d MemLoc: %5d Q: %5d Bmnum: %5d Angle: %13.4lf [deg] Freq Range: %-8.5e - %-8.5e [Hz]\n", c, b, opt_qual[b],
                                opt_bmnum[b],   opt_bmangle_deg[b],
                                opt_freq_lo[b], opt_freq_hi[b]
                      );
-                      fprintf(stdout,"             pcode: %5d :: tdelay [ns]:: Min: %-08.5e Max: %-08.5e Ave: %-08.5e Target: %-08.5e Delta: %-08.5e\n",
+                      fprintf(stdout,"             pcode: %5d :: tdelay [ns]:: Min: %-8.5e Max: %-8.5e Ave: %-8.5e Target: %-8.5e Delta: %-8.5e\n",
                         opt_pcode[b],opt_tdelay_min[b],opt_tdelay_max[b],opt_tdelay_ave[b],opt_tdelay_target[b],fabs(opt_tdelay_ave[b]-opt_tdelay_target[b]));
-                      fprintf(stdout,"             acode: %5d :: gain   [dB]:: Min: %-08.5e Max: %-08.5e Ave: %-08.5e Target: %-08.5e Delta %-08.5e\n",
+                      fprintf(stdout,"             acode: %5d :: gain   [dB]:: Min: %-8.5e Max: %-8.5e Ave: %-8.5e Target: %-8.5e Delta %-8.5e\n",
                         opt_acode[b],opt_gain_min[b],opt_gain_max[b],opt_gain_ave[b],opt_gain_target[b],fabs(opt_gain_ave[b]-opt_gain_target[b]));
               }
               rval=MSI_dio_write_memory(b,rnum,c,opt_pcode[b],opt_acode[b],sshflag,verbose);

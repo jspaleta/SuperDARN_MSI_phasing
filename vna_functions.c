@@ -19,7 +19,7 @@ int mlog_data_command(int sock,char *command,double *array[VNA_FREQS],int b,int 
   double base,exp;
   int32_t cr,lf;
       strcpy(command2,command);
-      if (verbose>2) printf("%d Command: %s\n",strlen(command2),command2);
+      if (verbose>2) printf("%d Command: %s\n",(int) strlen(command2),command2);
       write(sock, &command2, sizeof(char)*strlen(command2));
       cr=0;
       lf=0;
@@ -121,7 +121,7 @@ int button_command(int sock, char *command,int wait_ms,int verbose) {
  * *  Process Command String with No feedback 
  * */
       strcpy(command2,command);
-      if (verbose>2) fprintf(stdout,"%d Command: %s\n",strlen(command2),command2);
+      if (verbose>2) fprintf(stdout,"%d Command: %s\n",(int) strlen(command2),command2);
       write(sock, &command2, sizeof(char)*strlen(command2));
       count=0;
       if (verbose>2) fprintf(stdout,"\nPrompt String::\n");
@@ -131,7 +131,7 @@ int button_command(int sock, char *command,int wait_ms,int verbose) {
         if (verbose>2) fprintf(stdout,"%c",output[0]);
         count++;
       }
-      if (verbose>2) fprintf(stdout,"Command is done\n",command2);
+      if (verbose>2) fprintf(stdout,"Command is done\n");
       fflush(stdout);
   usleep(wait_ms*1000);
   return 0;

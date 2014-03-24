@@ -1,7 +1,7 @@
 OS:=$(shell uname -s)
 
 CC=gcc
-CFLAGS=-B /usr/ -c
+CFLAGS=-Wall -B /usr/ -c
 common_libs=-lm
 #linux_libs=-lgsl -lgslcblas
 linux_libs=

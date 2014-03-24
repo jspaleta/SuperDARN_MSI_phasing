@@ -9,6 +9,7 @@
  *
  */
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdint.h>
 #include <math.h>
 #include "MSI_functions.h"
@@ -99,7 +100,6 @@ double MSI_timedelay_needed(double angle_degrees,double spacing_meters,int32_t c
   double needed=0;
   double c=0.299792458; // meters per nanosecond
   int32_t antenna=-1;
-  double radians=0.0;
   if (card > 15) antenna=card-10;
   else antenna=card;
   deltat=(spacing_meters/c)*sin((fabs(angle_degrees)*3.14159)/180.0); //nanoseconds

@@ -21,15 +21,11 @@ void mypause ( void )
 
 int opentcpsock(char *hostip, int port){
 	//DECLARE VARIABLES FOR IP CONNECTIONS
-	char	datacode,ipaddr[16];
-	int		sock,data,temp;
+	int		sock,temp;
 	struct	sockaddr_in	server;
 	struct	hostent		*hp, *gethostbyname();
-	float	ftime;
-	int		buffer2,channel2,sample2i,option,optionlen;
-	int		do_scan_rx[4];
-	struct 	protent*	protocol_info;
-
+	int		option;
+        socklen_t optionlen;
 	//hostip=HOST;
 	//port=DEFAULT_PORT;
 
