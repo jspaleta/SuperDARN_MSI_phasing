@@ -137,17 +137,27 @@ int button_command(int sock, char *command,int wait_ms,int verbose) {
   return 0;
 }
 
-int take_data(int sock,int b,int rnum,int c, int p,int a, double *pwr_mag[VNA_FREQS],double *phase[VNA_FREQS],double *tdelay[VNA_FREQS],int wait_ms,int ssh_flag,int verbose){
+int take_data(int sock,int b,int rnum,int c, int p,int a, double *pwr_mag[VNA_FREQS],double *phase[VNA_FREQS],double *tdelay[VNA_FREQS],
+              int wait_ms,int ssh_flag,int verbose,double target_tdelay,double target_pwr){
   int t,rval;
+  char command[128]="";
+
   rval=MSI_dio_write_memory(b,rnum,c,p,a,ssh_flag,verbose);
   if(rval!=0) return rval;
+
   usleep(1000*wait_ms);
   button_command(sock,":SENS1:AVER:CLE\r\n",30,verbose);
   for(t=0;t<VNA_triggers;t++) {
                       button_command(sock,":TRIG:SING\r\n",0,verbose);
                       button_command(sock,"*OPC?\r\n",0,verbose);
   }
+  button_command(sock,"DISP:WIND1:TRAC1:Y:AUTO\r\n",10,verbose);
   button_command(sock,"DISP:WIND1:TRAC3:Y:AUTO\r\n",10,verbose);
+  sprintf(command,"DISP:WIND1:TRAC3:Y:RLEV %E\r\n",target_tdelay);
+  button_command(sock,command,10,verbose);
+  sprintf(command,"DISP:WIND1:TRAC2:Y:RLEV %E\r\n",target_pwr);
+  button_command(sock,command,10,verbose);
+
   button_command(sock,":CALC1:PAR1:SEL\r\n",10,verbose);
   mlog_data_command(sock,":CALC1:DATA:FDAT?\r\n",phase,b,verbose) ;
   button_command(sock,":CALC1:PAR2:SEL\r\n",10,verbose);

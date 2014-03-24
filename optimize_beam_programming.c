@@ -329,14 +329,17 @@ int main(int argc, char **argv ) {
        button_command(sock,command,10,verbose);
        button_command(sock,":CALC1:PAR:COUN 3\r\n",10,verbose);
 
+       /* First Trace: Unwrapped Phase */
        button_command(sock,":CALC1:PAR1:SEL\r\n",10,verbose);
        button_command(sock,":CALC1:PAR1:DEF S12\r\n",10,verbose);
        button_command(sock,":CALC1:FORM UPH\r\n",10,verbose);
 
+       /* Second Trace: Log Pwr*/
        button_command(sock,":CALC1:PAR2:SEL\r\n",10,verbose);
        button_command(sock,":CALC1:PAR2:DEF S12\r\n",10,verbose);
        button_command(sock,":CALC1:FORM MLOG\r\n",10,verbose);
 
+       /* Third Trace: Smoothed Group Delay*/
        button_command(sock,":CALC1:PAR3:SEL\r\n",10,verbose);
        button_command(sock,":CALC1:PAR3:DEF S12\r\n",10,verbose);
        button_command(sock,":CALC1:FORM GDEL\r\n",10,verbose);
@@ -379,6 +382,20 @@ int main(int argc, char **argv ) {
 
 
      }
+     /* Make sure Markers are setup for span viewing */
+     button_command(sock,":CALC1:MARK1 ON\r\n",10,verbose);
+     button_command(sock,":CALC1:MARK2 ON\r\n",10,verbose);
+     button_command(sock,":CALC1:PAR1:SEL\r\n",10,verbose);
+     button_command(sock,":CALC1:MARK:MATH:STAT ON\r\n",10,verbose);
+     button_command(sock,":CALC1:PAR2:SEL\r\n",10,verbose);
+     button_command(sock,":CALC1:MARK:MATH:STAT ON\r\n",10,verbose);
+     button_command(sock,":CALC1:PAR3:SEL\r\n",10,verbose);
+     button_command(sock,":CALC1:MARK:MATH:STAT ON\r\n",10,verbose);
+     sprintf(command,":CALC1:MARK1:X %E\r\n",VNA_MIN);
+     button_command(sock,command,10,verbose);
+     sprintf(command,":CALC1:MARK2:X %E\r\n",VNA_MAX);
+     button_command(sock,command,10,verbose);
+
      button_command(sock,":SENS1:AVER:CLE\r\n",10,verbose);
      for(t=0;t<VNA_triggers;t++) {
         button_command(sock,":TRIG:SING\r\n",0 ,verbose );
@@ -549,15 +566,19 @@ int main(int argc, char **argv ) {
                       fprintf(stdout,"        Initial tdelay: %lf [ns] atten: %lf [dB]\n",best_tdelay,best_pwr);
                       fflush(stdout);
                     } 
+                    sprintf(command,":CALC1:MARK1:X %E\r\n",freq_lo[f]);
+                    button_command(sock,command,10,verbose);
+                    sprintf(command,":CALC1:MARK2:X %E\r\n",freq_hi[f]);
+                    button_command(sock,command,10,verbose);
 
                     /* Take a measurement at best phasecode and acode */
                     while(wflag>0) { 
-                      rval=take_data(sock,b,rnum,c,best_phasecode,best_attencode,opwr_mag,ophase,otdelay,wait_ms,wait_ms,sshflag,verbose);
+                      rval=take_data(sock,b,rnum,c,best_phasecode,best_attencode,opwr_mag,ophase,otdelay,wait_ms,sshflag,verbose,needed_timedelay,MSI_target_pwr_dB);
                       if(rval!=0) {
                         fprintf(stderr,"Error: Take data failed!\n");
                         exit(rval);
                       }
-                      rval=take_data(sock,b,rnum,c,best_phasecode,best_attencode,pwr_mag,phase,tdelay,wait_ms,wait_ms,sshflag,verbose);
+                      rval=take_data(sock,b,rnum,c,best_phasecode,best_attencode,pwr_mag,phase,tdelay,wait_ms,sshflag,verbose,needed_timedelay,MSI_target_pwr_dB);
                       if(rval!=0) { 
                         fprintf(stderr,"Error: Take data failed!\n");
                         exit(rval);
@@ -616,7 +637,7 @@ int main(int argc, char **argv ) {
                           ac=ac-acode_step;
                           if (ac < 0 ) ac=0;
                           if (ac > 63 ) ac=63;
-                          rval=take_data(sock,b,rnum,c,best_phasecode,ac,pwr_mag,phase,tdelay,wait_ms,sshflag,verbose);
+                          rval=take_data(sock,b,rnum,c,best_phasecode,ac,pwr_mag,phase,tdelay,wait_ms,sshflag,verbose,needed_timedelay,MSI_target_pwr_dB);
                           if(rval!=0) {
                             fprintf(stderr,"Error: Take data failed!\n");
                             exit(rval);
@@ -667,7 +688,7 @@ int main(int argc, char **argv ) {
 		        if(acode_min < 0) acode_min=0; 
                         if(acode_max > 63) acode_max=63; 
                         for(ac=acode_min;ac<=acode_max;ac++) {
-                          rval=take_data(sock,b,rnum,c,best_phasecode,ac,pwr_mag,phase,tdelay,wait_ms,sshflag,verbose);
+                          rval=take_data(sock,b,rnum,c,best_phasecode,ac,pwr_mag,phase,tdelay,wait_ms,sshflag,verbose,needed_timedelay,MSI_target_pwr_dB);
                           if(rval!=0) { 
                             fprintf(stderr,"Error: Take data failed!\n");
                             exit(rval);
@@ -696,7 +717,7 @@ int main(int argc, char **argv ) {
                         fprintf(stdout,"        Optimized acode: %d %lf %lf\n",best_attencode,best_pwr,MSI_target_pwr_dB); 
                       }
 
-                      rval=take_data(sock,b,rnum,c,best_phasecode,best_attencode,pwr_mag,phase,tdelay,wait_ms,sshflag,verbose);
+                      rval=take_data(sock,b,rnum,c,best_phasecode,best_attencode,pwr_mag,phase,tdelay,wait_ms,sshflag,verbose,needed_timedelay,MSI_target_pwr_dB);
                       if(rval!=0) { 
                             fprintf(stderr,"Error: Take data failed!\n");
                             exit(rval);
@@ -745,8 +766,7 @@ int main(int argc, char **argv ) {
                           pc=pc+pcode_step;
                           if (pc < 0 ) pc=0;
                           if (pc >= MSI_phasecodes  ) pc=MSI_phasecodes-1;
-                          rval=take_data(sock,b,rnum,c,pc,best_attencode,pwr_mag,phase,tdelay,wait_ms,sshflag,verbose);
-                          rval=take_data(sock,b,rnum,c,pc,best_attencode,pwr_mag,phase,tdelay,wait_ms,sshflag,verbose);
+                          rval=take_data(sock,b,rnum,c,pc,best_attencode,pwr_mag,phase,tdelay,wait_ms,sshflag,verbose,needed_timedelay,MSI_target_pwr_dB);
                           if(rval!=0) { 
                             fprintf(stderr,"Error: Take data failed!\n");
                             exit(rval);
@@ -823,7 +843,7 @@ int main(int argc, char **argv ) {
                       fprintf(stdout,"        Optimizing phasecode.... %d measurements needed\n",pcode_range); 
 
                       for(pc=pcode_min;pc<=pcode_max;pc++) {
-                        rval=take_data(sock,b,rnum,c,pc,best_attencode,pwr_mag,phase,tdelay,wait_ms,sshflag,verbose);
+                        rval=take_data(sock,b,rnum,c,pc,best_attencode,pwr_mag,phase,tdelay,wait_ms,sshflag,verbose,needed_timedelay,MSI_target_pwr_dB);
                         if(rval!=0) { 
                             fprintf(stderr,"Error: Take data failed!\n");
                             exit(rval);
@@ -848,7 +868,7 @@ int main(int argc, char **argv ) {
                         } 
                       } 
                     }
-                    rval=take_data(sock,b,rnum,c,best_phasecode,best_attencode,pwr_mag,phase,tdelay,wait_ms,sshflag,verbose);
+                    rval=take_data(sock,b,rnum,c,best_phasecode,best_attencode,pwr_mag,phase,tdelay,wait_ms,sshflag,verbose,needed_timedelay,MSI_target_pwr_dB);
                     if(rval!=0) { 
                             fprintf(stderr,"Error: Take data failed!\n");
                             exit(rval);
