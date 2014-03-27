@@ -117,35 +117,52 @@ int MSI_dio_write_memory(int b,int rnum,int c, int p,int a,int ssh_flag,int verb
   char diopost[512]="2>/dev/null 1>/dev/null";
   //char diopost[512]="";
   int rval;
+  int try=3;
+  int uwait=10;
+  verbose=2; 
   if( verbose > 2 ) fprintf(stdout,"Take Data: c:%d b:%d p:%d a:%d\n",c,b,p,a);
 
   if (b>=MSI_phasecodes) {
                      fprintf(stderr,"Bad memory address: %d\n",b);
                       return 1;
   }
-  sprintf(diocmd,"write_card_memory -m %d -r %d -c %d -p %d -a %d",
+  while (try>0) {
+    sprintf(diocmd,"write_card_memory -m %d -r %d -c %d -p %d -a %d",
                             b,rnum,c,p,a);
-  if(ssh_flag!=0) sprintf(fullcmd,"ssh %s '%s' %s",ssh_userhost,diocmd,diopost);
-  else sprintf(fullcmd,"%s %s",diocmd,diopost);
-  if( verbose > 1 ) fprintf(stdout,"Command: %s\n",fullcmd);
-  rval=system(fullcmd);
+    if(ssh_flag!=0) sprintf(fullcmd,"ssh %s '%s' %s",ssh_userhost,diocmd,diopost);
+    else sprintf(fullcmd,"%s %s",diocmd,diopost);
+    if( verbose > 1 ) fprintf(stdout,"Command: %s\n",fullcmd);
+    rval=system(fullcmd);
+    rval=system(fullcmd);
   
-  if(rval!=0) {
+    if(rval!=0) {
                       fprintf(stderr,"Dio memory write error, exiting\n");
                       return rval;
-  }
-  sprintf(diocmd,"verify_card_memory -m %d -r %d -c %d -p %d -a %d",
+    }
+    usleep(uwait); 
+    sprintf(diocmd,"verify_card_memory -m %d -r %d -c %d -p %d -a %d",
                             b,rnum,c,p,a);
-  if(ssh_flag!=0) sprintf(fullcmd,"ssh %s '%s' %s",ssh_userhost,diocmd,diopost);
-  else sprintf(fullcmd,"%s %s",diocmd,diopost);
-  if( verbose > 1 ) fprintf(stdout,"Command: %s\n",fullcmd);
-  rval=system(fullcmd);
-  if(rval!=0) {
-                      fprintf(stderr,"Dio memory verify error, exiting: %d\n",rval);
-                      fflush(stderr);
-                      fflush(stdout);
-                      return rval;
-  }
+    if(ssh_flag!=0) sprintf(fullcmd,"ssh %s '%s' %s",ssh_userhost,diocmd,diopost);
+    else sprintf(fullcmd,"%s %s",diocmd,diopost);
+    if( verbose > 1 ) fprintf(stdout,"Command: %s\n",fullcmd);
+    rval=system(fullcmd);
+    if(rval!=0) {
+      fprintf(stderr,"Dio memory verify error, try again: %d\n",rval);
+      fprintf(stderr,"  Command: %s\n",fullcmd);
+      sprintf(diopost," ");
+      fflush(stderr);
+      fflush(stdout);
+      uwait+=500;
+      verbose=2;
+      try--;
+    } else {
+      break;
+    }
+  }    
+  if (try<=0) {
+     fprintf(stderr,"Dio memory verify error, exiting:\n",rval);
+     return rval;
+  }                   
   fflush(stdout);
   return 0;
 }

@@ -153,7 +153,8 @@ int take_data(int sock,int b,int rnum,int c, int p,int a, double *pwr_mag[VNA_FR
   }
   button_command(sock,"DISP:WIND1:TRAC1:Y:AUTO\r\n",10,verbose);
   button_command(sock,"DISP:WIND1:TRAC3:Y:AUTO\r\n",10,verbose);
-  sprintf(command,"DISP:WIND1:TRAC3:Y:RLEV %E\r\n",target_tdelay);
+  sprintf(command,"DISP:WIND1:TRAC3:Y:RLEV %E\r\n",target_tdelay*1E-9);
+  fprintf(stdout,command);
   button_command(sock,command,10,verbose);
   sprintf(command,"DISP:WIND1:TRAC2:Y:RLEV %E\r\n",target_pwr);
   button_command(sock,command,10,verbose);
