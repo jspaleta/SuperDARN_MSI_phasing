@@ -93,10 +93,12 @@ int32_t main()
   printf("\n\nEnter File End: ");
   fflush(stdin);
   fflush(stdout);
+/*
   scanf("%s", &end);
   fflush(stdout);
   fflush(stdin);
   printf("End: <%s>\n",end);
+*/
   sprintf(dirstub,"/%s/%s/",caldir,radar_name);
 
   for(i=0;i<MAX_FREQS;i++) {
@@ -117,7 +119,8 @@ int32_t main()
   for(c=MIN_CARD;c<=MAX_CARD;c++) {
     skip=0;
     error_flag=0;
-    sprintf(filename,"%s/phasing_cal_%s_%02d_%s.dat",dirstub,radar_name,c,end);
+    //sprintf(filename,"%s/phasing_cal_%s_%02d_%s.dat",dirstub,radar_name,c,end);
+    sprintf(filename,"%s/phasing_cal_%s_%02d.dat",dirstub,radar_name,c);
     if (verbose > -1 ) fprintf(stdout,"Opening: %s\n",filename); 
     calfile=fopen(filename,"r");
     //if (verbose > 1 ) fprintf(stdout,"Opening: %p %s\n",calfile,filename); 

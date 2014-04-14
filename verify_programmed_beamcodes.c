@@ -40,7 +40,7 @@
 #define BEAMCODES 8192 
 #define MAX_FREQS 1201 
 #define MAX_ANGLES 32 
-#define MAX_FSTEPS 16 
+#define MAX_FSTEPS  64 
 #define F_OFFSET 64 
 #define MIN_FREQ 11.9E6
 #define MAX_FREQ 12.1E6
@@ -75,7 +75,7 @@ int32_t main(int argc, char **argv)
   int32_t *final_phasecodes[CARDS], *final_attencodes[CARDS];
   double *final_angles[CARDS];
   double *final_freqs[CARDS];
-  int32_t a=0,f=0,i=0,card=0,c=0,b=0,rval=0,count=0,attempt=0; 
+  int32_t a=0,f=0,i=0,card=-1,c=0,b=0,rval=0,count=0,attempt=0; 
   int32_t num_freqs,max_angles,num_angles,num_beamcodes,num_fsteps,fstep,foffset,num_cards;
   double fextent=0.0,f0=0.0,fm=0.0,df=0.0,angle,freq,min_freq=MIN_FREQ,max_freq=MAX_FREQ;
   int32_t requested_phasecode=0, requested_attencode=0,beamcode=0;
@@ -247,6 +247,7 @@ int32_t main(int argc, char **argv)
       if(beamtablefile!=NULL) {
         printf("Reading from saved beamcode lookup table\n"); 
         fread(&num_freqs,sizeof(int32_t),1,beamtablefile);
+        printf("Num freqs: %d\n",num_freqs);
         fread(&num_angles,sizeof(int32_t),1,beamtablefile);
         printf("Num angles: %d\n",num_angles);
         fread(&max_angles,sizeof(int32_t),1,beamtablefile);
@@ -284,7 +285,7 @@ int32_t main(int argc, char **argv)
         if (beamnm >= 32)  beamnm=31;
         read=1;
       } else {
-        fprintf(stderr,"Error writing beam lookup table file\n");
+        fprintf(stderr,"Error reading beam lookup table file\n");
         read=0;
       }
   }

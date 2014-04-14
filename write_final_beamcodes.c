@@ -436,17 +436,21 @@ int32_t main(int argc, char **argv)
   } // end of card loop
   c=card;
   while((c<CARDS) && (c >=0)) {
-      if (write_matrix) {
+      if (write_matrix) 
         fprintf(stdout,"Writing Beamcodes to Card: %d\n",c);
+      if (read_matrix) 
+        fprintf(stdout,"Reading Beamcodes to Card: %d\n",c);
+      if (write_matrix||read_matrix) {
         for (b=0;b<BEAMCODES;b++) {
          printf("B: %d PhaseCode: %d AttenCode: %d\n",b,final_beamcodes[c][b],final_attencodes[c][b]); 
            if (final_beamcodes[c][b] >= 0 ) {
               if(NEW_PMAT) {
-                temp=write_data_new(IOBASE,c,b,final_beamcodes[c][b],radar,0);
+                if (write_matrix) 
+                  temp=write_data_new(IOBASE,c,b,final_beamcodes[c][b],radar,0);
                 for(attempt=0;attempt<10;attempt++) {
                   temp=verify_data_new(IOBASE,c,b,final_beamcodes[c][b],radar,0);
                   if(temp<0) {
-                    printf("Verify Error: attempt: %d\n",attempt); 
+                    printf("Verify Phase Error: attempt: %d\n",attempt); 
                     usleep(10000);
                   } else {
                     break;
@@ -456,11 +460,12 @@ int32_t main(int argc, char **argv)
                   printf("EXIT on repeat Verify Errors\n");
                   exit(temp); 
                 }
-                temp=write_attenuators(IOBASE,c,b,final_attencodes[c][b],radar); //JDS need to set attenuators here
+                if (write_matrix) 
+                  temp=write_attenuators(IOBASE,c,b,final_attencodes[c][b],radar); //JDS need to set attenuators here
                 for(attempt=0;attempt<10;attempt++) {
                   temp=verify_attenuators(IOBASE,c,b,final_attencodes[c][b],radar);
                   if(temp<0) {
-                 //   printf("Verify Error: attempt: %d\n",attempt); 
+                    printf("Verify Atten Error: attempt: %d\n",attempt); 
                     usleep(10000);
                   } else {
                     break;
@@ -472,7 +477,8 @@ int32_t main(int argc, char **argv)
                 }
 
               } else {
-                temp=write_data_old(IOBASE,c,b,final_beamcodes[c][b],radar,0);
+                if (write_matrix) 
+                  temp=write_data_old(IOBASE,c,b,final_beamcodes[c][b],radar,0);
               }
            } else {
              //printf("final_beamcode error %d\n",b);

@@ -13,7 +13,7 @@
 //#define MAX_FREQS 1201 
 #define MAX_PHASES 8192
 #define MAX_ANGLES 32 
-#define NUM_ANGLES 24 
+#define NUM_ANGLES 22 
 #define USE_MEASURED_ATTENS 1 
 #define MIN_ATTEN_FREQ_HZ 10E6
 #define MAX_ATTEN_FREQ_HZ 16E6
@@ -44,7 +44,6 @@ double timedelay_needed(double angle,double spacing,int32_t card) {
   double needed=0;
   double c=0.299792458; // meters per nanosecond
   int32_t antenna=-1;
-  double radians=0.0;
   if (card > 15) antenna=card-10;
   else antenna=card;
   deltat=(spacing/c)*sin((fabs(angle)*3.14159)/180.0); //nanoseconds
@@ -71,18 +70,17 @@ int32_t main()
   double best_lo_atten_value;
   int32_t best_attencode;
   double best_atten_value;
-  double best_pwr_mag;
   double *ave_timedelay;
   double *beam_pwr_mag, *beam_timedelay;
   int32_t *beam_attencode;
   int32_t *beam_phasecode;
   double ave_phasecode_td,best_phasecode_td,worst_phasecode_td,fallback_phasecode_td;
-  double allowed_td_diff,allowed_td_span,phasecode_td_span,worst_phasecode_td_diff,fallback_td_span;
+  double allowed_td_diff,allowed_td_span,phasecode_td_span,fallback_td_span;
   int    within_allowed_td,within_allowed_span;
   double *beam_atten_value,av;
-  double frequency_lo,frequency_hi,frequency,df;
-  int32_t b,c,i,ii,j,p,f,ang,a,count,data_count;
-  int32_t summary_freqs,summary_phases;
+  double frequency_lo,frequency_hi,df;
+  int32_t b,c,i,ii,j,p,f,a,count,data_count;
+  int32_t summary_freqs;
   int32_t ave_num_freqs,num_freqs,num_phasecodes,num_cards,num_steps,num_angles;
   int32_t num_atten_freqs,num_attencodes,num_atten_cards;
   char filename[120];
@@ -96,11 +94,9 @@ int32_t main()
   double expected_atten,atten,atten_steps[6];
   int bad_atten_pwr,bad_atten_steps[6];
 
-  int num_ave_freqs;
   char *caldir=NULL;
   char radar_name[80]="";
   char dirstub[160]="";
-  char poop;
   int ick;
   double middle=(float)(NUM_ANGLES-1)/2.0;
   printf("Middle: %lf\n",middle);
@@ -112,7 +108,7 @@ int32_t main()
   printf("\n\nEnter Radar Name: ");
   fflush(stdin);
   fflush(stdout);
-  scanf("%s", &radar_name);
+  scanf("%s", radar_name);
   fflush(stdout);
   fflush(stdin);
   printf("Radar: <%s>\n",radar_name);
@@ -640,4 +636,5 @@ int32_t main()
 
 // free card arrays
   } //card loop
+  return 0;
 } //main
