@@ -14,6 +14,7 @@
 #include <math.h>
 #include <time.h>
 #include <signal.h>
+#include <ctype.h>
 
 /* helper functions  for vna */
 #include "vna_functions.h"
@@ -47,7 +48,7 @@ extern char      ssh_userhost[128];
 static int keepRunning = 1;
 
 void intHandler(int dummy) {
-    printf("HERRRRRRRRRRRRRRRRRRRR\n");
+    printf("HERE\n");
     keepRunning = 0;
 };
 
@@ -55,68 +56,27 @@ int main(int argc, char **argv ) {
      
      int verbose=0;
      int rval;
-     int i,c,b,a,f,t,bf,ba,pc,ac;
-     struct timespec begin_card, end_card;
-     double  time_spent_card;
-     struct timespec begin_angle, end_angle;
-     double  time_spent_angle;
-     struct timespec begin_step, end_step;
-     double  time_spent_step;
-     int32_t loops_total, loops_done;
+     int c,b,f;
+     int32_t loops_total;
 
-     int32_t best_beam_freq_index,best_beam_angle_index,best_phasecode,best_attencode; 
-     double best_tdelay,best_pwr;
      int first_card=0,last_card=19;
 
-     double *phase[VNA_FREQS],*pwr_mag[VNA_FREQS], *tdelay[VNA_FREQS];
-     double *ophase[VNA_FREQS],*opwr_mag[VNA_FREQS], *otdelay[VNA_FREQS];
-     double freq[VNA_FREQS];
  
-     double middle=(float)(MSI_num_angles-1)/2.0;
-     double angles_degrees[MSI_num_angles];
      double freq_center[MSI_max_freq_steps];
      double freq_lo[MSI_max_freq_steps];
      double freq_hi[MSI_max_freq_steps];
      int32_t freq_steps=0;
-     int32_t wait_ms=50;
 
-     double timedelay_nsecs,needed_tdelay;
-     double td_sum,td_ave,pwr_sum,pwr_ave;
-     double td_min,td_max,td_pp;
-     double pwr_min,pwr_max,pwr_pp;
-     double adelta,tdelta;
-     double test_adelta,test_tdelta;
-     double asign,tsign;
-     int32_t fast_loop,count,acode_step,pcode_step;
-     double fdiff,tdiff;
-
-     int32_t nave,pcode_range,pcode_min,pcode_max;
-     int32_t acode_range,acode_min,acode_max;
 
      int32_t    memloc;
  
-     FILE *beamcodefile=NULL;
      FILE *optbeamcodefile=NULL;
      char *caldir=NULL;
      char dirstub[256]="";
      char filename[512]="";
      char radar_name[16]="";
-     int32_t sshflag=0,vflag=0,wflag=0,mflag=0,nflag=0,cflag=0,rflag=0,rnum=0,port=23;
+     int32_t sshflag=0,vflag=0,wflag=0,mflag=0,nflag=0,cflag=0,rflag=0,rnum=0;
 
-     double beam_highest_time0_nsec,beam_lowest_pwr_dB,beam_middle;
-     int32_t    num_beam_freqs,num_beam_angles,num_beam_steps;
-     double     *beam_freqs=NULL;
-     double     *beam_angles=NULL;
-     double     *beam_requested_delay=NULL;
-     double     *beam_needed_delay=NULL;
-     double     *beam_freq_lo=NULL;
-     double     *beam_freq_hi=NULL;
-     double     *beam_freq_center=NULL;
-     double     *beam_pwr_dB=NULL;
-     double     *beam_tdelay_nsec=NULL;
-     int32_t     *beam_attencode=NULL;
-     int32_t     *beam_phasecode=NULL;
-     int32_t    beam_freq_index;
 
 /* 
 *  The optimized arrays are length MSI_phasecodes 
@@ -265,21 +225,7 @@ int main(int argc, char **argv ) {
        opt_gain_min[b]=1E13;
        opt_gain_max[b]=1E13;
      }
-     for(i=0;i<VNA_FREQS;i++) {
-       freq[i]=MSI_min_freq+i*((MSI_max_freq-MSI_min_freq)/(double)(VNA_FREQS-1));
-       phase[i]=calloc(MSI_phasecodes,sizeof(double));
-       tdelay[i]=calloc(MSI_phasecodes,sizeof(double));
-       pwr_mag[i]=calloc(MSI_phasecodes,sizeof(double));
-       ophase[i]=calloc(MSI_phasecodes,sizeof(double));
-       otdelay[i]=calloc(MSI_phasecodes,sizeof(double));
-       opwr_mag[i]=calloc(MSI_phasecodes,sizeof(double));
-     }
 
-
-     /* Fill the angles array */
-     for(a=0;a<MSI_num_angles;a++) {
-               angles_degrees[a]=(a-middle)*MSI_bm_sep_degrees;
-     }
      /* Determine the freq steps */
      freq_steps=(MSI_max_freq-MSI_min_freq)/MSI_freq_window+1;
      if (freq_steps > MSI_max_freq_steps) {
@@ -413,13 +359,13 @@ int main(int argc, char **argv ) {
             }
             if(opt_qual[b]>-1) {
               if (verbose > -1 ) {
-                      fprintf(stdout,"           Card: %5d MemLoc: %5d Q: %5d Bmnum: %5d Angle: %13.4lf [deg] Freq Range: %-08.5e - %-08.5e [Hz]\n", c, b, opt_qual[b],
+                      fprintf(stdout,"           Card: %5d MemLoc: %5d Q: %5d Bmnum: %5d Angle: %13.4lf [deg] Freq Range: %-8.5e - %-8.5e [Hz]\n", c, b, opt_qual[b],
                                opt_bmnum[b],   opt_bmangle_deg[b],
                                opt_freq_lo[b], opt_freq_hi[b]
                      );
-                      fprintf(stdout,"             pcode: %5d :: tdelay [ns]:: Min: %-08.5e Max: %-08.5e Ave: %-08.5e Target: %-08.5e Delta: %-08.5e\n",
+                      fprintf(stdout,"             pcode: %5d :: tdelay [ns]:: Min: %-8.5e Max: %-8.5e Ave: %-8.5e Target: %-8.5e Delta: %-8.5e\n",
                         opt_pcode[b],opt_tdelay_min[b],opt_tdelay_max[b],opt_tdelay_ave[b],opt_tdelay_target[b],fabs(opt_tdelay_ave[b]-opt_tdelay_target[b]));
-                      fprintf(stdout,"             acode: %5d :: gain   [dB]:: Min: %-08.5e Max: %-08.5e Ave: %-08.5e Target: %-08.5e Delta %-08.5e\n",
+                      fprintf(stdout,"             acode: %5d :: gain   [dB]:: Min: %-8.5e Max: %-8.5e Ave: %-8.5e Target: %-8.5e Delta %-8.5e\n",
                         opt_acode[b],opt_gain_min[b],opt_gain_max[b],opt_gain_ave[b],opt_gain_target[b],fabs(opt_gain_ave[b]-opt_gain_target[b]));
               }
               if(wflag==1) {
@@ -441,7 +387,7 @@ int main(int argc, char **argv ) {
                 rval=MSI_dio_verify_memory(b,rnum,c,opt_pcode[b],opt_acode[b],sshflag,verbose);
                 if (WIFSIGNALED(rval) && (WTERMSIG(rval) == SIGINT || WTERMSIG(rval) == SIGQUIT)) return rval;
                 if (rval!=0) {
-                      fprintf(stdout,"  ERROR:  Card: %5d MemLoc: %5d Q: %5d Bmnum: %5d Angle: %13.4lf [deg] Freq Range: %-08.5e - %-08.5e [Hz]\n", c, b, opt_qual[b],
+                      fprintf(stdout,"  ERROR:  Card: %5d MemLoc: %5d Q: %5d Bmnum: %5d Angle: %13.4lf [deg] Freq Range: %-8.5e - %-8.5e [Hz]\n", c, b, opt_qual[b],
                                opt_bmnum[b],   opt_bmangle_deg[b],
                                opt_freq_lo[b], opt_freq_hi[b]
                      );

@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <unistd.h>
 #include <math.h>
 #include "MSI_functions.h"
 /* settings which I could probably move to an ini file */
@@ -160,7 +161,7 @@ int MSI_dio_write_memory(int b,int rnum,int c, int p,int a,int ssh_flag,int verb
     }
   }    
   if (try<=0) {
-     fprintf(stderr,"Dio memory verify error, exiting:\n",rval);
+     fprintf(stderr,"Dio memory verify error, exiting: %d\n",rval);
      return rval;
   }                   
   fflush(stdout);
