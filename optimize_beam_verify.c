@@ -513,6 +513,7 @@ int main(int argc, char **argv ) {
          if (verbose > -1 ) fprintf(stdout,"Writing lookup table values to file: %s\n",filename);
          optlookupfile=fopen(filename,"w");
          if (optlookupfile!=NULL) {
+           fwrite(&MSI_phasecodes,    sizeof(int32_t),1,optlookupfile);
            fwrite(&lookup_mem_offset, sizeof(int32_t),1,optlookupfile);
            fwrite(&lookup_freq_steps, sizeof(int32_t),1,optlookupfile);
            fwrite(lookup_bmnum,       sizeof(int32_t),MSI_phasecodes,optlookupfile);
