@@ -516,5 +516,6 @@ int32_t main()
      lowest_pwr_mag_index[0],freq[lowest_pwr_mag_index[0]],lowest_pwr_mag_index[1],lowest_pwr_mag_index[2]);
   if(freq!=NULL) free(freq);
   freq=NULL;
+  return 0; 
 } // end of main
 

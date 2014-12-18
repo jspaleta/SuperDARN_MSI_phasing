@@ -34,7 +34,7 @@
 #define ON       1
 #define OFF      0
 
-#define NEW_PMAT 1 
+#define NEW_PMAT 0 
 
 #define CARDS 200 
 #define PHASECODES 8192 
