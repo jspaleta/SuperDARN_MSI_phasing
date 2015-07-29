@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stdio.h>
+#include <unistd.h>
 #include <time.h>
 #include <math.h>
 #ifdef __QNX__
@@ -49,6 +50,7 @@ int32_t set_WE(int32_t base,int32_t onoff,int32_t radar){
                 out8(base+portC,temp | 0x01);
         }
 #endif
+  return 0;
 }
 /*-SET READ/WRITE BIT-------------------------------------------------------*/
 int32_t set_RW(int32_t base,int32_t rw,int32_t radar){
@@ -81,7 +83,9 @@ int32_t set_RW(int32_t base,int32_t rw,int32_t radar){
                 out8(base+portC,temp | 0x40);
         }
 #endif
+  return 0;
 }
+
 /*-SET SWITCHED/ATTEN BIT-------------------------------------------------------*/
 int32_t set_SA(int32_t base,int32_t sa,int32_t radar){
         int32_t temp;
@@ -113,6 +117,7 @@ int32_t set_SA(int32_t base,int32_t sa,int32_t radar){
                 out8(base+portC,temp | 0x80);
         }
 #endif
+  return 0;
 }
 
 
@@ -631,22 +636,44 @@ int32_t write_data_old(uint32_t base, int32_t card, int32_t code, int32_t data,i
                 fprintf(stderr,"INVALID DATA TO WRITE - must be between 0 and 8192\n");
                 return -1;
         }
+    // bit reverse the data
+        data=reverse_bits(data);
+    // choose the beam code to read (output appropriate EEPROM address
+        temp=beam_code(base,code,radar);
+        out8(base+portC0,temp);
+    // check to see if card is already programmed correctly
+    // select card to read
+        temp=select_card(base,card,radar);
+    // reset CH1, PortA and PortB to inputs
+        usleep(1000);
+        out8(base+cntrl1,0x93);
+        usleep(1000);
+        out8(base+cntrl1,0x13);
+        usleep(1000);
+        temp=select_card(base,card,radar);
+    // read PortA and PortB to see if EEPROM output is same as progammed
+        temp=in8(base+portB1);
+        temp=temp & 0x1f;
+        temp=temp << 8;
+        temp=temp + in8(base+portA1);
+        if (temp == data){
+          return 0;
+        }
+        printf("Writing Data to card: %d MemoryLoc: %d\n",card,code);
+ 
     // select card 31 so that no real card is selected
         temp=select_card(base,31,radar);
     // choose the beam code to write (output appropriate EEPROM address
         temp=beam_code(base,code,radar);
-       usleep(1000);
+        out8(base+portC0,temp);
+        usleep(1000);
     // enable writing (turn on WRITE_ENABLE);
         temp=in8(base+portC0);
         temp=temp | 0x01;
         out8(base+portC0,temp);
-       usleep(1000);
+        usleep(1000);
     // set CH1, PortA and Port B to output for writing
         out8(base+cntrl1,0x81);
-    // bit reverse the data
-        if(print) printf("Data to write %d  ",data);
-        data=reverse_bits(data);
-        if(print) printf("  reversed: %d\n",data);
     // apply the data to be written to PortA and PortB on CH1
        usleep(1000);
     // set CH1, Port A to lowest 8 bits of data and output on PortA
@@ -662,11 +689,11 @@ int32_t write_data_old(uint32_t base, int32_t card, int32_t code, int32_t data,i
     // select card 31 so that no real card is selected
         temp=select_card(base,31,radar);
     // reset CH1, PortA and PortB to inputs
-       usleep(1000);
+        usleep(1000);
         out8(base+cntrl1,0x93);
-       usleep(1000);
+        usleep(1000);
         out8(base+cntrl1,0x13);
-       usleep(1000);
+        usleep(1000);
     // disable writing (turn off WRITE_ENABLE);
         temp=in8(base+portC0);
         temp=temp & 0xfe;
@@ -680,20 +707,99 @@ int32_t write_data_old(uint32_t base, int32_t card, int32_t code, int32_t data,i
         temp=temp << 8;
         temp=temp + in8(base+portA1);
         if (temp == data){
-                if(print)
-                  printf("    Code read after writing is %d\n", reverse_bits(temp));
-                temp=select_card(base,31,radar);
-                return 0;
-        }
-        else {
-                printf(" ERROR - Old Card DATA NOT WRITTEN: data: %x != readback: %x :: Code: %d Card: %d\n", reverse_bits(data), reverse_bits(temp),code,card);
-                temp=select_card(base,31,radar);
-                return -1;
+          if(print)
+            printf("    Code read after writing is %d\n", reverse_bits(temp));
+          temp=select_card(base,31,radar);
+          return 0;
+        } else {
+          printf(" ERROR - Old Card DATA NOT WRITTEN: data: %x != readback: %x :: Code: %d Card: %d\n", reverse_bits(data), reverse_bits(temp),code,card);
+          temp=select_card(base,31,radar);
+          return -1;
         }
 #else
   return 0;
 #endif
 }
+
+/*-VERITY_CODE--------------------------------------------------------*/
+
+int verify_data_old(unsigned int base, int card, int code, int data,int radar,int print){
+
+        int temp;
+        struct  timespec nsleep;
+        nsleep.tv_sec=0;
+        nsleep.tv_nsec=5000;
+        int portA0,portB0,portC0,cntrl0;
+        int portA1,portB1,portC1,cntrl1;
+        switch(radar) {
+          case 1:
+            portC0=PC_GRP_0;
+            portC1=PC_GRP_1;
+            portB0=PB_GRP_0;
+            portB1=PB_GRP_1;
+            portA0=PA_GRP_0;
+            portA1=PA_GRP_1;
+            cntrl0=CNTRL_GRP_0;
+            cntrl1=CNTRL_GRP_1;
+            break;
+          case 2:
+            portC0=PC_GRP_2;
+            portC1=PC_GRP_3;
+            portB0=PB_GRP_2;
+            portB1=PB_GRP_3;
+            portA0=PA_GRP_2;
+            portA1=PA_GRP_3;
+            cntrl0=CNTRL_GRP_2;
+            cntrl1=CNTRL_GRP_3;
+            break;
+          case 3:
+            portC0=PC_GRP_4;
+            portC1=PC_GRP_3;
+            portB0=PB_GRP_4;
+            portB1=PB_GRP_3;
+            portA0=PA_GRP_4;
+            portA1=PA_GRP_3;
+            cntrl0=CNTRL_GRP_4;
+            cntrl1=CNTRL_GRP_3;
+            break;
+        }
+   // check that the data to write is valid
+        if ( (data>8192) | (data<0) ){
+          fprintf(stderr,"INVALID DATA TO WRITE - must be between 0 and 8192\n");
+          return -1;
+        }
+    // choose the beam code to write (output appropriate EEPROM address
+        temp=beam_code(base,code,radar);
+
+        out8(base+portC0,temp);
+
+    // bit reverse the data
+        data=reverse_bits(data);
+    // check to see if card is already programmed correctly
+       temp=select_card(base,card,radar);
+    // reset CH1, PortA and PortB to inputs
+        out8(base+cntrl1,0x93);
+        usleep(1000);
+        out8(base+cntrl1,0x13);
+        usleep(1000);
+    // select card to read
+        select_card(base,card,radar);
+    // read PortA and PortB to see if EEPROM output is same as progammed
+        temp=in8(base+portB1);
+        temp=temp & 0x1f;
+        temp=temp << 8;
+        temp=temp + in8(base+portA1);
+        if (temp == data){
+          // select card 31 so that no real card is selected
+          select_card(base,31,radar);
+          return 0;
+        } else {
+          // select card 31 so that no real card is selected
+          select_card(base,31,radar);
+          return -1;
+        }
+}
+
 
 /*-READ_DATA---------------------------------------------------------*/
 int32_t read_data(uint32_t base,int32_t radar){

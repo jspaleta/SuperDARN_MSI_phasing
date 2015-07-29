@@ -147,7 +147,7 @@ ifeq ($(OS),Linux)
 	$(CC) -o $@ $(CONVERT_OBJECTS) $(common_libs) $(linux_libs) 
 endif
 ifeq ($(OS),QNX)
-	$(CC) -L/usr/lib/ -o $@ $(CONVERT_OBJECTS) $(common_libs) $(qnx_libs) -lgsl -lgslcblas 
+	$(CC) -L/usr/lib/ -o $@ $(CONVERT_OBJECTS) $(common_libs) $(qnx_libs)  
 endif
 
 $(COMPARE_EXECUTABLE): $(COMPARE_OBJECTS)

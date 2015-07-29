@@ -555,7 +555,19 @@ int32_t main(int argc, char **argv)
                 }
 
              } else {
-                //temp=write_data_old(IOBASE,c,beamcode,b,radar,0);
+               for(attempt=0;attempt<10;attempt++) {
+                 temp=verify_data_old(IOBASE,c,b,final_beamcodes[c][b],radar,0);
+                 if(temp<0) {
+                 //  printf("Verify Error: attempt: %d\n",attempt);
+                   delay(10);
+                 } else {
+                   break;
+                 }
+               }
+               if(temp<0) {
+                  printf("EXIT on repeat Verify Errors\n");
+                  exit(temp);
+               }
              }
           }
         } //end beamcode loop 
