@@ -178,12 +178,10 @@ int main(int argc, char **argv ) {
           caldir=strdup("/data/calibrations/");
      }
      sprintf(dirstub,"/%s/%s/",caldir,radar_name);
-     if(mflag==0) {
-       fprintf(stdout,"CALDIR: %s\n",caldir);
-       printf("Radar: <%s>\n",radar_name);
-       fprintf(stdout,"RADARDIR: %s\n",dirstub);
-       fflush(stdout);
-     }
+     fprintf(stdout,"MSI_CALDIR: %s\n",caldir);
+     printf("Radar: <%s>\n",radar_name);
+     fprintf(stdout,"RADARDIR: %s\n",dirstub);
+     fflush(stdout);
      struct stat s;
      int err = stat(dirstub, &s);
      if(-1 == err) {
@@ -265,8 +263,9 @@ int main(int argc, char **argv ) {
      } else {
        optlookupfile=fopen(filename,"r");
        if (optlookupfile!=NULL) {
-         if (verbose > -1 ) fprintf(stdout,"    Reading Optimized lookup table:\n");
-         if (verbose > -1 ) fprintf(stdout,"      Opened: %s\n",filename);
+         if (verbose > -1 ) fprintf(stdout,"  Reading Optimized lookup table:\n");
+         if (verbose > -1 ) fprintf(stdout,"    Opened: %s\n",filename);
+         fread(&lookup_num_codes, sizeof(int32_t),1,optlookupfile);
          fread(&lookup_mem_offset, sizeof(int32_t),1,optlookupfile);
          fread(&lookup_freq_steps, sizeof(int32_t),1,optlookupfile);
          fread(lookup_bmnum,       sizeof(int32_t),MSI_phasecodes,optlookupfile);
@@ -274,16 +273,16 @@ int main(int argc, char **argv ) {
          fread(lookup_freq_lo,     sizeof(double) ,MSI_phasecodes,optlookupfile);
          fread(lookup_freq_hi,     sizeof(double) ,MSI_phasecodes,optlookupfile);
          fread(lookup_qual,        sizeof(int32_t),MSI_phasecodes,optlookupfile);
-         if (verbose > -1 ) fprintf(stdout,"Lookup table:\n");
-         if (verbose > -1 ) fprintf(stdout,"  Mem Offset: %d\n",lookup_mem_offset);
-         if (verbose > -1 ) fprintf(stdout,"  Freq Steps: %d\n",lookup_freq_steps);
+         if (verbose > -1 ) fprintf(stdout,"  Lookup table:\n");
+         if (verbose > -1 ) fprintf(stdout,"    Mem Offset: %d\n",lookup_mem_offset);
+         if (verbose > -1 ) fprintf(stdout,"    Freq Steps: %d\n",lookup_freq_steps);
          for(b=0;b<MSI_phasecodes;b++) {
            if(opt_qual[b]>-1) {
              if (verbose > -1 ) fprintf(stdout,"  %5d Bmnum: %3d " ,b,lookup_bmnum[b]);
-             if (verbose > -1 ) fprintf(stdout,"Qual: %3d ",lookup_qual[b]);
-             if (verbose > -1 ) fprintf(stdout,"Freq_lo: %8.3e ",lookup_freq_lo[b]);
-             if (verbose > -1 ) fprintf(stdout,"Freq_hi: %8.3e ",lookup_freq_hi[b]);
-             if (verbose > -1 ) fprintf(stdout,"Freq_c : %8.3e\n",lookup_freq_center[b]);
+             if (verbose > -1 ) fprintf(stdout,"  Qual: %3d ",lookup_qual[b]);
+             if (verbose > -1 ) fprintf(stdout,"  Freq_lo: %8.3e ",lookup_freq_lo[b]);
+             if (verbose > -1 ) fprintf(stdout,"  Freq_hi: %8.3e ",lookup_freq_hi[b]);
+             if (verbose > -1 ) fprintf(stdout,"  Freq_c : %8.3e\n",lookup_freq_center[b]);
            }
          }
          lookup_seen=1;
@@ -301,10 +300,8 @@ int main(int argc, char **argv ) {
           sprintf(filename,"%s/optcodes_cal_%s_%02d.dat",dirstub,radar_name,c);
           optbeamcodefile=fopen(filename,"r");
           if (optbeamcodefile!=NULL) {
-            if(mflag==0) {
-              if (verbose > -1 ) fprintf(stdout,"    Reading Optimized values from file for card: %d\n",c);
-              if (verbose > -1 ) fprintf(stdout,"      Opened: %s\n",filename);
-            }
+            if (verbose > -1 ) fprintf(stdout,"  Reading Optimized values from file for card: %d\n",c);
+            if (verbose > -1 ) fprintf(stdout,"    Opened: %s\n",filename);
             /* Length of the arrays */
             fread(&MSI_phasecodes,  sizeof(int32_t),1,optbeamcodefile);
             /* memory offset to start of narrow freq band */
@@ -325,16 +322,15 @@ int main(int argc, char **argv ) {
             /* Narrow frequency window considered */
             fread(&MSI_freq_window, sizeof(double),1,optbeamcodefile);
             loops_total=freq_steps*MSI_num_angles;
-            if(mflag==0) {
-              fprintf(stdout,"Info:: Angles: %d\n",MSI_num_angles);
-              fprintf(stdout,"Info:: Freq Steps: %d\n",freq_steps);
-              fprintf(stdout,"Info:: Optimizations per card: %d\n",loops_total);
-              fprintf(stdout,"Info:: Max Card Memory Location: %d\n",opt_mem_offset+(freq_steps*opt_mem_offset+MSI_num_angles));
-              if(sshflag==1) fprintf(stdout,"Info:: SSH: %s\n",ssh_userhost);
-              if(wflag==1) fprintf(stdout,"Ready to begin writing saved programmming to card memory\n");
-              else fprintf(stdout,"Ready to readback saved programmming from file\n");
-              mypause();
-            }
+            fprintf(stdout,"Info:: Optcodes File Info for Card: %d \n",c);
+            fprintf(stdout,"Info:: Angles: %d\n",MSI_num_angles);
+            fprintf(stdout,"Info:: Freq Steps: %d\n",freq_steps);
+            fprintf(stdout,"Info:: Optimizations per card: %d\n",loops_total);
+            fprintf(stdout,"Info:: Max Card Memory Location: %d\n",opt_mem_offset+(freq_steps*opt_mem_offset+MSI_num_angles));
+            if(sshflag==1) fprintf(stdout,"Info:: SSH: %s\n",ssh_userhost);
+            if(wflag==1) fprintf(stdout,"Ready to begin writing saved programmming to card memory\n");
+            else fprintf(stdout,"Ready to readback saved programmming from file\n");
+            mypause();
             if(keepRunning==0) return 0; 
 
  
@@ -415,14 +411,23 @@ int main(int argc, char **argv ) {
                 if(lookup_freq_hi[b]!=opt_freq_hi[b]) lookup_mismatch=1;
                 if(lookup_freq_center[b]!=opt_freq_center[b]) lookup_mismatch=1;
                 if(lookup_mismatch) {
+                  if (verbose > -1 ) fprintf(stdout,"Mismatch between Lookup table and optcode file:\n");
                   if (verbose > -1 ) fprintf(stdout,"Lookup table:\n");
                   if (verbose > -1 ) fprintf(stdout,"  Mem Offset: %d\n",lookup_mem_offset);
                   if (verbose > -1 ) fprintf(stdout,"  Freq Steps: %d\n",lookup_freq_steps);
                   if (verbose > -1 ) fprintf(stdout,"  %5d Bmnum: %3d " ,b,lookup_bmnum[b]);
-                  if (verbose > -1 ) fprintf(stdout,"Qual: %3d ",lookup_qual[b]);
-                  if (verbose > -1 ) fprintf(stdout,"Freq_lo: %8.3e ",lookup_freq_lo[b]);
-                  if (verbose > -1 ) fprintf(stdout,"Freq_hi: %8.3e ",lookup_freq_hi[b]);
-                  if (verbose > -1 ) fprintf(stdout,"Freq_c : %8.3e\n",lookup_freq_center[b]);
+                  if (verbose > -1 ) fprintf(stdout,"  Qual: %3d ",lookup_qual[b]);
+                  if (verbose > -1 ) fprintf(stdout,"  Freq_lo: %8.3e ",lookup_freq_lo[b]);
+                  if (verbose > -1 ) fprintf(stdout,"  Freq_hi: %8.3e ",lookup_freq_hi[b]);
+                  if (verbose > -1 ) fprintf(stdout,"  Freq_c : %8.3e\n",lookup_freq_center[b]);
+                  if (verbose > -1 ) fprintf(stdout,"Optcode:\n");
+                  if (verbose > -1 ) fprintf(stdout,"  Mem Offset: %d\n",opt_mem_offset);
+                  if (verbose > -1 ) fprintf(stdout,"  Freq Steps: %d\n",freq_steps);
+                  if (verbose > -1 ) fprintf(stdout,"  %5d Bmnum: %3d " ,b,opt_bmnum[b]);
+                  if (verbose > -1 ) fprintf(stdout,"  Qual: %3d ",opt_qual[b]);
+                  if (verbose > -1 ) fprintf(stdout,"  Freq_lo: %8.3e ",opt_freq_lo[b]);
+                  if (verbose > -1 ) fprintf(stdout,"  Freq_hi: %8.3e ",opt_freq_hi[b]);
+                  if (verbose > -1 ) fprintf(stdout,"  Freq_c : %8.3e\n",opt_freq_center[b]);
                   exit(0);
                 }
               }
@@ -436,9 +441,8 @@ int main(int argc, char **argv ) {
             if(keepRunning==0) return 0; 
             if(mflag==1) {
               if (b!=memloc) continue;
-            }
-            if(opt_qual[b]>-1) {
-              if (verbose > -1 ) {
+              if(opt_qual[b]>-1) {
+                if (verbose > -1 ) {
                       fprintf(stdout,"           Card: %5d MemLoc: %5d Q: %5d Bmnum: %5d Angle: %13.4lf [deg] Freq Range: %-8.5e - %-8.5e [Hz]\n", c, b, opt_qual[b],
                                opt_bmnum[b],   opt_bmangle_deg[b],
                                opt_freq_lo[b], opt_freq_hi[b]
@@ -447,12 +451,13 @@ int main(int argc, char **argv ) {
                         opt_pcode[b],opt_tdelay_min[b],opt_tdelay_max[b],opt_tdelay_ave[b],opt_tdelay_target[b],fabs(opt_tdelay_ave[b]-opt_tdelay_target[b]));
                       fprintf(stdout,"             acode: %5d :: gain   [dB]:: Min: %-8.5e Max: %-8.5e Ave: %-8.5e Target: %-8.5e Delta %-8.5e\n",
                         opt_acode[b],opt_gain_min[b],opt_gain_max[b],opt_gain_ave[b],opt_gain_target[b],fabs(opt_gain_ave[b]-opt_gain_target[b]));
-              }
-              if(wflag==1) {
-                rval=MSI_dio_write_memory(b,rnum,c,opt_pcode[b],opt_acode[b],sshflag,verbose);
-                if (WIFSIGNALED(rval) && (WTERMSIG(rval) == SIGINT || WTERMSIG(rval) == SIGQUIT)) return rval;
-              } else {
+                }
+                if(wflag==1) {
+                  rval=MSI_dio_write_memory(b,rnum,c,opt_pcode[b],opt_acode[b],sshflag,verbose);
+                  if (WIFSIGNALED(rval) && (WTERMSIG(rval) == SIGINT || WTERMSIG(rval) == SIGQUIT)) return rval;
+                } else {
 
+                }
               }
             }
           }
